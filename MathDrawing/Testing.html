@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Smart Labels & Dragging</title>
+    <style>
+        canvas { border: 1px solid #ccc; background: #fafafa; cursor: crosshair; }
+        body { display: flex; flex-direction: column; align-items: center; font-family: sans-serif; padding: 20px; }
+        .info { margin-top: 10px; color: #666; font-size: 14px; text-align: center; line-height: 1.6; }
+    </style>
+</head>
+<body>
+    <h3>Умные подписи и ручное перемещение</h3>
+    <canvas id="testCanvas" width="800" height="500"></canvas>
+    <div class="info">
+        <b>Клик:</b> создать точку. <b>Зажать подпись:</b> переместить (макс. 70px).<br>
+        Линии автоматически подписываются "lineline". Все подписи избегают коллизий.
+    </div>
+
+<script>
+const canvas = document.getElementById('testCanvas');
+const ctx = canvas.getContext('2d');
+
+let points = [];
+let lines = [];
+let draggingLabel = null; // Объект подписи, которую тянем
+
+const POINT_RADIUS = 5;
+const MAX_DRAG_DIST = 70;
+const FONT_STYLE = "bold 13px Arial";
+
+const SmartMath = {
+    intersect: (p1, p2, p3, p4) => {
+        const det = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x);
+        if (det === 0) return false;
+        const lambda = ((p4.y - p3.y) * (p4.x - p1.x) + (p3.x - p4.x) * (p4.y - p1.y)) / det;
+        const gamma = ((p1.y - p2.y) * (p4.x - p1.x) + (p2.x - p1.x) * (p4.y - p1.y)) / det;
+        return (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1);
+    },
+    lineRect(p1, p2, rx, ry, rw, rh) {
+        const edges = [
+            {a: {x: rx, y: ry}, b: {x: rx + rw, y: ry}},
+            {a: {x: rx + rw, y: ry}, b: {x: rx + rw, y: ry + rh}},
+            {a: {x: rx + rw, y: ry + rh}, b: {x: rx, y: ry + rh}},
+            {a: {x: rx, y: ry + rh}, b: {x: rx, y: ry}}
+        ];
+        return edges.some(edge => this.intersect(p1, p2, edge.a, edge.b));
+    }
+};
+
+const SmartLayout = {
+    padding: 4,
+
+    getSize(text) {
+        ctx.font = FONT_STYLE;
+        const m = ctx.measureText(text);
+        return { w: m.width + this.padding * 2, h: 16 };
+    },
+
+    // Проверка, не перекрывает ли рамка другие объекты
+    isBlocked(lx, ly, w, h, owner) {
+        const hitPoint = points.some(p => (p.x > lx && p.x < lx + w && p.y > ly && p.y < ly + h));
+        const hitLine = lines.some(l => SmartMath.lineRect(l.p1, l.p2, lx, ly, w, h));
+        return hitPoint || hitLine;
+    },
+
+    // Расчет финальной позиции
+    calcPos(owner, text) {
+        const size = this.getSize(text);
+        
+        // Если есть ручное смещение
+        let basePos = { x: owner.x, y: owner.y };
+        if (owner.p1) { // Если это линия, привязываемся к центру
+            basePos = { x: (owner.p1.x + owner.p2.x)/2, y: (owner.p1.y + owner.p2.y)/2 };
+        }
+
+        let targetX = basePos.x + owner.labelOff.dx;
+        let targetY = basePos.y + owner.labelOff.dy;
+
+        // Если авто-позиция (не перетаскивали), проверяем коллизии
+        if (!owner.isManual && this.isBlocked(targetX, targetY, size.w, size.h, owner)) {
+            const alts = [
+                {dx: 12, dy: -20}, {dx: -size.w-12, dy: -20}, 
+                {dx: 12, dy: 10}, {dx: -size.w-12, dy: 10},
+                {dx: -size.w/2, dy: -size.h-15}, {dx: -size.w/2, dy: 15}
+            ];
+            for (let a of alts) {
+                if (!this.isBlocked(basePos.x + a.dx, basePos.y + a.dy, size.w, size.h, owner)) {
+                    targetX = basePos.x + a.dx;
+                    targetY = basePos.y + a.dy;
+                    break;
+                }
+            }
+        }
+
+        return { x: targetX, y: targetY, w: size.w, h: size.h };
+    }
+};
+
+// --- СОБЫТИЯ ---
+
+canvas.onmousedown = (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const m = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+    // Проверяем, попали ли в подпись (точки или линии)
+    const allObjects = [...points, ...lines];
+    for (let obj of allObjects) {
+        const box = obj.lastBox;
+        if (box && m.x > box.x && m.x < box.x + box.w && m.y > box.y && m.y < box.y + box.h) {
+            draggingLabel = obj;
+            return;
+        }
+    }
+
+    // Если не попали в подпись — создаем точку
+    addPoint(m.x, m.y);
+};
+
+window.onmousemove = (e) => {
+    if (!draggingLabel) return;
+    const rect = canvas.getBoundingClientRect();
+    const m = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+
+    let base = draggingLabel.p1 
+        ? { x: (draggingLabel.p1.x + draggingLabel.p2.x)/2, y: (draggingLabel.p1.y + draggingLabel.p2.y)/2 }
+        : { x: draggingLabel.x, y: draggingLabel.y };
+
+    let dx = m.x - base.x;
+    let dy = m.y - base.y;
+
+    // Ограничение 70 пикселей через вектор
+    const dist = Math.hypot(dx, dy);
+    if (dist > MAX_DRAG_DIST) {
+        dx = (dx / dist) * MAX_DRAG_DIST;
+        dy = (dy / dist) * MAX_DRAG_DIST;
+    }
+
+    draggingLabel.labelOff = { dx, dy };
+    draggingLabel.isManual = true;
+    draw();
+};
+
+window.onmouseup = () => { draggingLabel = null; };
+
+function addPoint(x, y) {
+    const name = String.fromCharCode(65 + points.length);
+    const p = { x, y, name, labelOff: {dx: 10, dy: -20}, isManual: false };
+    if (points.length > 0) {
+        lines.push({ 
+            p1: points[points.length - 1], 
+            p2: p, 
+            name: "lineline", 
+            labelOff: {dx: 10, dy: -10}, 
+            isManual: false 
+        });
+    }
+    points.push(p);
+    draw();
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Линии
+    lines.forEach(l => {
+        ctx.beginPath(); ctx.strokeStyle = '#2d3436';
+        ctx.moveTo(l.p1.x, l.p1.y); ctx.lineTo(l.p2.x, l.p2.y);
+        ctx.stroke();
+
+        // Подпись линии
+        const box = SmartLayout.calcPos(l, l.name);
+        l.lastBox = box;
+        renderBox(box, l.name, '#636e72');
+    });
+
+    // Точки
+    points.forEach(p => {
+        ctx.fillStyle = '#0984e3';
+        ctx.beginPath(); ctx.arc(p.x, p.y, POINT_RADIUS, 0, 7); ctx.fill();
+
+        // Подпись точки
+        const box = SmartLayout.calcPos(p, p.name);
+        p.lastBox = box;
+        renderBox(box, p.name, '#2d3436');
+    });
+}
+
+function renderBox(box, text, color) {
+    ctx.fillStyle = 'rgba(255,255,255,0.8)';
+    ctx.fillRect(box.x, box.y, box.w, box.h);
+    ctx.strokeStyle = draggingLabel && (draggingLabel.lastBox === box) ? '#e17055' : 'rgba(0,0,0,0.1)';
+    ctx.strokeRect(box.x, box.y, box.w, box.h);
+    
+    ctx.fillStyle = color;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText(text, box.x + SmartLayout.padding, box.y + 2);
+}
+
+draw();
+</script>
+</body>
+</html>

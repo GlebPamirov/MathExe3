@@ -12,6 +12,7 @@ const MathDrawingEvents = {
     lastTapTime: 0,
     selectedForAngle: [],
     alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+	draggingLabel: null, // Новое состояние
 
 	init(canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -50,6 +51,17 @@ const MathDrawingEvents = {
         const pos = this.getPos(e);
         this.startPos = this.lastPos = pos;
         const el = MathDrawingCore.elements;
+		
+		// 1. Проверяем попадание в рамки подписей (у них должен быть сохранен lastBox)
+        const all = [...el.points, ...el.lines];
+        const hit = all.find(obj => obj.lastBox && 
+            pos.x > obj.lastBox.x && pos.x < obj.lastBox.x + obj.lastBox.w &&
+            pos.y > obj.lastBox.y && pos.y < obj.lastBox.y + obj.lastBox.h);
+
+        if (hit) {
+            this.draggingLabel = hit;
+            return; // Прерываем, чтобы не начать рисовать линию
+        }
 
         // Закрываем меню при новом клике
         MathDrawingUI.closeMenu();
@@ -110,6 +122,30 @@ const MathDrawingEvents = {
         const pos = this.getPos(e);
         this.lastPos = pos;
         if (Math.hypot(pos.x - this.startPos.x, pos.y - this.startPos.y) > 10) clearTimeout(this.tapTimer);
+		
+		if (this.draggingLabel) {
+            const obj = this.draggingLabel;
+            const el = MathDrawingCore.elements;
+            let base = obj.p1id 
+                ? { 
+                    x: (el.points.find(p=>p.id===obj.p1id).x + el.points.find(p=>p.id===obj.p2id).x)/2, 
+                    y: (el.points.find(p=>p.id===obj.p1id).y + el.points.find(p=>p.id===obj.p2id).y)/2 
+                  }
+                : { x: obj.x, y: obj.y };
+
+            let dx = pos.x - base.x;
+            let dy = pos.y - base.y;
+
+            // Лимит 70px
+            const dist = Math.hypot(dx, dy);
+            if (dist > 70) {
+                dx *= 70/dist; dy *= 70/dist;
+            }
+
+            obj.labelOff = { dx, dy };
+            obj.isManual = false; // Фиксируем ручной режим
+            return;
+        }
 
         if (this.isDragging && this.activePoint) {
             this.activePoint.x = pos.x;
@@ -132,6 +168,11 @@ const MathDrawingEvents = {
     handleEnd() {
         clearTimeout(this.tapTimer);
         const el = MathDrawingCore.elements;
+		
+		if (this.draggingLabel) {
+            MathDrawingCore.save();
+            this.draggingLabel = null;
+        }
 
         if (this.isDragging && this.activePoint) {
             // "Слипание" точек при завершении перетаскивания

@@ -54,5 +54,84 @@ const MathDrawingEngine = {
             }
         }
         return null;
+    }, 
+	
+	getLabelSize(ctx, text) {
+        ctx.font = "italic 13px Arial"; // Тот же шрифт, что в Render
+        const m = ctx.measureText(text);
+        const padding = 4;
+        return { w: m.width + padding * 2, h: 16 };
+    },
+
+    /** Проверка пересечения линии и прямоугольника (рамки подписи) */
+    lineRectIntersect(p1, p2, rx, ry, rw, rh) {
+        const intersect = (a, b, c, d) => {
+            const det = (b.x - a.x) * (d.y - c.y) - (b.y - a.y) * (d.x - c.x);
+            if (det === 0) return false;
+            const lambda = ((d.y - c.y) * (d.x - a.x) + (c.x - d.x) * (d.y - a.y)) / det;
+            const gamma = ((a.y - b.y) * (d.x - a.x) + (b.x - a.x) * (d.y - a.y)) / det;
+            return (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1);
+        };
+        const edges = [
+            {a: {x: rx, y: ry}, b: {x: rx + rw, y: ry}},
+            {a: {x: rx + rw, y: ry}, b: {x: rx + rw, y: ry + rh}},
+            {a: {x: rx + rw, y: ry + rh}, b: {x: rx, y: ry + rh}},
+            {a: {x: rx, y: ry + rh}, b: {x: rx, y: ry}}
+        ];
+        return edges.some(edge => intersect(p1, p2, edge.a, edge.b));
+    },
+
+    /** Поиск лучшей позиции для подписи */
+    calculateSmartPos(ctx, owner, text, elements) {
+        const size = this.getLabelSize(ctx, text);
+        const MAX_DRAG = 70;
+
+        // Определяем базовую точку (центр линии или координаты точки)
+        let base = owner.p1id 
+            ? { 
+                x: (elements.points.find(p=>p.id===owner.p1id).x + elements.points.find(p=>p.id===owner.p2id).x)/2, 
+                y: (elements.points.find(p=>p.id===owner.p1id).y + elements.points.find(p=>p.id===owner.p2id).y)/2 
+              }
+            : { x: owner.x, y: owner.y };
+
+        // Если есть ручное смещение
+        if (!owner.labelOff) owner.labelOff = { dx: 12, dy: -20 };
+        
+        let tx = base.x + owner.labelOff.dx;
+        let ty = base.y + owner.labelOff.dy;
+
+        // Если не в ручном режиме — проверяем коллизии и ищем замену
+        if (!owner.isManual) {
+            const isBlocked = (x, y) => {
+                const hitP = elements.points.some(p => (p.x > x && p.x < x + size.w && p.y > y && p.y < y + size.h));
+                const hitL = elements.lines.some(l => {
+                    const p1 = elements.points.find(pt => pt.id === l.p1id);
+                    const p2 = elements.points.find(pt => pt.id === l.p2id);
+                    return this.lineRectIntersect(p1, p2, x, y, size.w, size.h);
+                });
+                return hitP || hitL;
+            };
+
+            if (isBlocked(tx, ty)) {
+                const dirs = [
+                    {dx: 12, dy: -20}, {dx: -size.w-12, dy: -20}, 
+                    {dx: 12, dy: 10}, {dx: -size.w-12, dy: 10},
+                    {dx: -size.w/2, dy: 15}
+                ];
+                for (let d of dirs) {
+                    if (!isBlocked(base.x + d.dx, base.y + d.dy)) {
+                        tx = base.x + d.dx; ty = base.y + d.dy;
+                        owner.labelOff = d; // Запоминаем удачный авто-отскок
+                        break;
+                    }
+                }
+            }
+        }
+
+        return { x: tx, y: ty, w: size.w, h: size.h };
     }
+	
+	
+	
+	
 };

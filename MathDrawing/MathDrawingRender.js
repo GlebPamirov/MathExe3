@@ -45,6 +45,10 @@ const MathDrawingRender = {
 
     drawPoint(ctx, p, selectedIds) {
         // Добавим проверку, чтобы ошибка в одной точке не вешала весь рендер
+		const box = MathDrawingEngine.calculateSmartPos(ctx, p, p.name, MathDrawingCore.elements);
+        p.lastBox = box; // Сохраняем для событий
+        this.drawLabelBox(ctx, box, p.name, '#2d3436');
+		
         if (!p) return;
         ctx.beginPath(); 
         ctx.arc(p.x, p.y, this.POINT_RADIUS, 0, Math.PI * 2);
@@ -52,15 +56,18 @@ const MathDrawingRender = {
         ctx.fill();
 		
         // Подпись имени
-        ctx.fillStyle = '#2d3436';
-        ctx.font = 'italic 14px serif';
-        ctx.fillText(p.name || '', p.x + 8, p.y - 8);
+        //ctx.fillStyle = '#2d3436';
+        //ctx.font = 'italic 14px serif';
+        //ctx.fillText(p.name || '', p.x + 8, p.y - 8);
     },
 
     drawLine(ctx, l, points) {
         const p1 = points.find(p => p.id === l.p1id);
         const p2 = points.find(p => p.id === l.p2id);
         if (!p1 || !p2) return;
+		
+		// включить подпись линии по умолчанию для отладки
+		l.name = 'line';
 
         ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
         ctx.strokeStyle = '#2d3436'; 
@@ -69,13 +76,15 @@ const MathDrawingRender = {
         ctx.stroke();
         ctx.setLineDash([]);
 
-        if (l.name) {
-            ctx.fillStyle = '#0984e3';
-            ctx.fillText(l.name, (p1.x + p2.x) / 2 + 5, (p1.y + p2.y) / 2 - 5);
-        }
         
         // Отрисовка засечек (ticks)
         if (l.tick) this.drawTicks(ctx, p1, p2, l.tick);
+		
+		if (l.name) {
+            const box = MathDrawingEngine.calculateSmartPos(ctx, l, l.name, MathDrawingCore.elements);
+            l.lastBox = box;
+            this.drawLabelBox(ctx, box, l.name, '#636e72');
+        };
     },
 
     drawTicks(ctx, p1, p2, type) {
@@ -129,5 +138,15 @@ const MathDrawingRender = {
     drawTempLine(ctx, from, to) {
         ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y);
         ctx.strokeStyle = '#0984e3'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+    }, 
+	
+	drawLabelBox(ctx, box, text, color) {
+        ctx.fillStyle = 'rgba(255,255,255,0.7)';
+        ctx.fillRect(box.x, box.y, box.w, box.h);
+        ctx.fillStyle = color;
+        ctx.font = "italic 13px Arial";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        ctx.fillText(text, box.x + 4, box.y + 2);
     }
 };
