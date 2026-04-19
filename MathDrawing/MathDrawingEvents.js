@@ -181,6 +181,12 @@ const MathDrawingEvents = {
                 el.lines.forEach(l => { if (l.p1id === this.activePoint.id) l.p1id = target.id; if (l.p2id === this.activePoint.id) l.p2id = target.id; });
                 el.angles.forEach(a => { if (a.p1 === this.activePoint.id) a.p1 = target.id; if (a.p2 === this.activePoint.id) a.p2 = target.id; if (a.p3 === this.activePoint.id) a.p3 = target.id; });
                 el.points = el.points.filter(p => p.id !== this.activePoint.id);
+				
+				// Если после перемещения начало и конец линии совпали (длина 0), удаляем её
+				if (el.lines) {
+					el.lines = el.lines.filter(l => l.p1id !== l.p2id);
+				}
+				
             }
             MathDrawingCore.save();
         } 
@@ -196,6 +202,8 @@ const MathDrawingEvents = {
                 el.lines.push({ id: Math.random(), p1id: this.activePoint.id, p2id: target.id, tick: null, isDashed: false, isBold: false, name: '' });
                 MathDrawingCore.save();
             }
+			
+			
         }
         
         this.isDragging = false;
