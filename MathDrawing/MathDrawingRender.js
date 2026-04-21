@@ -44,21 +44,31 @@ const MathDrawingRender = {
     },
 
     drawPoint(ctx, p, selectedIds) {
-        // Добавим проверку, чтобы ошибка в одной точке не вешала весь рендер
-		const box = MathDrawingEngine.calculateSmartPos(ctx, p, p.name, MathDrawingCore.elements);
-        p.lastBox = box; // Сохраняем для событий
-        this.drawLabelBox(ctx, box, p.name, '#2d3436');
-		
         if (!p) return;
+
+        // Расчет и отрисовка подписи
+        const box = MathDrawingEngine.calculateSmartPos(ctx, p, p.name, MathDrawingCore.elements);
+        p.lastBox = box; 
+        this.drawLabelBox(ctx, box, p.name, '#2d3436');
+        
         ctx.beginPath(); 
         ctx.arc(p.x, p.y, this.POINT_RADIUS, 0, Math.PI * 2);
-		ctx.fillStyle = selectedIds.includes(p.id) ? '#ff7675' : '#2d3436';
-        ctx.fill();
-		
-        // Подпись имени
-        //ctx.fillStyle = '#2d3436';
-        //ctx.font = 'italic 14px serif';
-        //ctx.fillText(p.name || '', p.x + 8, p.y - 8);
+
+        // Определяем цвет (розовый если выбрана, иначе темно-серый)
+        const mainColor = selectedIds.includes(p.id) ? '#ff7675' : '#2d3436';
+
+        if (p.isHollow) {
+            // Выколотая точка: белый центр и цветная обводка
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.lineWidth = 2; // Делаем ободок чуть заметнее
+            ctx.strokeStyle = mainColor;
+            ctx.stroke();
+        } else {
+            // Обычная закрашенная точка
+            ctx.fillStyle = mainColor;
+            ctx.fill();
+        }
     },
 
     drawLine(ctx, l, points) {
@@ -67,7 +77,7 @@ const MathDrawingRender = {
         if (!p1 || !p2) return;
 		
 		// включить подпись линии по умолчанию для отладки
-		l.name = 'line';
+		//l.name = 'line';
 
         ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y);
         ctx.strokeStyle = '#2d3436'; 

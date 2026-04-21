@@ -23,6 +23,13 @@
             <button class="btn" style="color:red; border-color:red; width:100%; margin-top:5px" onclick="MathDrawingUI.deleteTarget()">Удалить</button>
         </div>
     </div>
+	
+	<div id="master-menu" style="display:none; position:absolute; z-index:1000; flex-direction:column; background:white; border:1px solid #ccc; padding:10px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); border-radius: 8px;">
+		<div id="menu-content"></div>
+		<hr>
+		<button onclick="MathDrawingUI.deleteTarget()" style="color:red; cursor:pointer;">Удалить</button>
+		<button onclick="MathDrawingUI.closeMenu()" style="margin-top:5px; cursor:pointer;">Закрыть</button>
+	</div>
     
     <script src="MathDrawingCore.js"></script>
     <script src="MathDrawingEngine.js"></script>

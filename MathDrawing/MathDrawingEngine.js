@@ -129,9 +129,29 @@ const MathDrawingEngine = {
         }
 
         return { x: tx, y: ty, w: size.w, h: size.h };
+    },
+	
+	/** Поиск любого объекта (точки или линии) под курсором */
+    findTarget(pos, elements) {
+        // 1. Сначала ищем точки (у них приоритет)
+        const point = elements.points.find(p => this.getDist(pos, p) < this.SNAP_DIST);
+        if (point) return point;
+
+        // 2. Если точка не найдена, ищем линии
+        const line = elements.lines.find(l => this.getDistToLine(pos, l, elements.points) < 10);
+        if (line) return line;
+
+        // 3. Ищем углы (если есть)
+        if (elements.angles) {
+            const angle = elements.angles.find(a => {
+                const p2 = elements.points.find(pt => pt.id === a.p2);
+                return p2 && this.getDist(pos, p2) < 20; // Клик рядом с вершиной угла
+            });
+            if (angle) return angle;
+        }
+
+        return null;
     }
-	
-	
 	
 	
 };

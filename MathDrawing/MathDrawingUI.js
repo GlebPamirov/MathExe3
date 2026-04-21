@@ -29,17 +29,47 @@ const MathDrawingUI = {
 
         if (type === 'point') {
             content.innerHTML = `
-                <div class="menu-row">Имя: <input type="text" value="${obj.name}" class="menu-input" oninput="MathDrawingUI.menuTarget.name=this.value"></div>
-                <div class="menu-row"><button class="btn-sm" onclick="MathDrawingUI.menuTarget.isHollow=!MathDrawingUI.menuTarget.isHollow;MathDrawingCore.save();">Выколоть</button></div>`;
+                <div class="menu-row"> 
+					<label> Обозначение </label>
+					<input type="text" value="${obj.name}" class="menu-input" oninput="MathDrawingUI.menuTarget.name=this.value">
+				</div>
+                <div class="menu-row">
+					<button class="btn-sm" onclick="MathDrawingUI.menuTarget.isHollow=!MathDrawingUI.menuTarget.isHollow;MathDrawingCore.save();">
+						<label> Выколоть / Закрасить </label>
+					</button>
+				</div>`;
         } else if (type === 'angle') {
+			
             content.innerHTML = `
-                <div class="menu-row">Буква: ${this.greeks.map(g => `<button class="btn-sm" onclick="MathDrawingUI.menuTarget.greek='${g}';MathDrawingCore.save();">${g}</button>`).join('')}</div>
-                <div class="menu-row">Дуги: <button class="btn-sm" onclick="MathDrawingUI.menuTarget.arcCount=1;MathDrawingCore.save();">1</button><button class="btn-sm" onclick="MathDrawingUI.menuTarget.arcCount=2;MathDrawingCore.save();">2</button><button class="btn-sm" onclick="MathDrawingUI.menuTarget.arcCount=3;MathDrawingCore.save();">3</button></div>`;
+                <div class="menu-row">
+					Буква: ${this.greeks.map(g => `<button class="btn-sm" onclick="MathDrawingUI.menuTarget.greek='${g}';MathDrawingCore.save();">${g}</button>`).join('')}
+				</div>
+                <div class="menu-row">
+					Дуги: 
+					<button class="btn-sm" onclick="MathDrawingUI.menuTarget.arcCount=1;MathDrawingCore.save();"> 1 </button>
+					<button class="btn-sm" onclick="MathDrawingUI.menuTarget.arcCount=2;MathDrawingCore.save();"> 2 </button>
+					<button class="btn-sm" onclick="MathDrawingUI.menuTarget.arcCount=3;MathDrawingCore.save();"> 3 </button>
+				</div>`;
         } else if (type === 'line') {
             content.innerHTML = `
-                <div class="menu-row">Имя: <input type="text" value="${obj.name || ''}" class="menu-input" oninput="MathDrawingUI.menuTarget.name=this.value"></div>
-                <div class="menu-row"><button class="btn-sm" onclick="MathDrawingUI.menuTarget.isDashed=!MathDrawingUI.menuTarget.isDashed;MathDrawingCore.save();">Пунктир</button><button class="btn-sm" onclick="MathDrawingUI.menuTarget.isBold=!MathDrawingUI.menuTarget.isBold;MathDrawingCore.save();">Жирная</button></div>
-                <div class="menu-row">Засечки: <button class="btn-sm" onclick="MathDrawingUI.setTick('I')">I</button><button class="btn-sm" onclick="MathDrawingUI.setTick('II')">II</button><button class="btn-sm" onclick="MathDrawingUI.setTick('Z')">Z</button></div>`;
+                <div class="menu-row"> 
+					<label> Обозначение </label>
+					<input type="text" value="${obj.name}" class="menu-input" oninput="MathDrawingUI.menuTarget.name=this.value">
+				</div>
+                <div class="menu-row">
+					<button class="btn-sm" onclick="MathDrawingUI.menuTarget.isDashed=!MathDrawingUI.menuTarget.isDashed;MathDrawingCore.save();">
+						Пунктир 
+					</button>
+					<button class="btn-sm" onclick="MathDrawingUI.menuTarget.isBold=!MathDrawingUI.menuTarget.isBold;MathDrawingCore.save();">
+						Жирная 
+					</button>
+					</div>
+                <div class="menu-row">
+					Засечки: 
+					<button class="btn-sm" onclick="MathDrawingUI.setTick('I')">I</button>
+					<button class="btn-sm" onclick="MathDrawingUI.setTick('II')">II</button>
+					<button class="btn-sm" onclick="MathDrawingUI.setTick('III')">III</button>
+				</div>`;
         }
 		
         menu.style.display = 'flex'; 
