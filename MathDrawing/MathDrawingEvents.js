@@ -147,67 +147,127 @@ const MathDrawingEvents = {
             return;
         }
 
-        if (this.isDragging && this.activePoint) {
-            this.activePoint.x = MathDrawingEngine.smartSnap(this.lastPos.x);
-			this.activePoint.y = MathDrawingEngine.smartSnap(this.lastPos.y);
-			
-			
+        // Привязка и отвязка точки от линии
+        // 2. Перемещение активной точки
+        if (this.activePoint && this.isDragging) {
+            const el = MathDrawingCore.elements;
             
-            // Динамическое обновление зависимых точек (пересечений)
-            MathDrawingCore.elements.points.forEach(p => {
-                if (p.parents && p.parents.length === 2) {
-                    const l1 = MathDrawingCore.elements.lines.find(l => l.id === p.parents[0].lid);
-                    const l2 = MathDrawingCore.elements.lines.find(l => l.id === p.parents[1].lid);
-                    if (l1 && l2) {
-                        const inter = MathDrawingEngine.getLinesIntersection(l1, l2, MathDrawingCore.elements.points);
-                        if (inter) { p.x = inter.x; p.y = inter.y; }
+            // ИСПРАВЛЕНИЕ: Ищем линии для привязки, ИСКЛЮЧАЯ те, где эта точка — вершина
+            const potentialLines = el.lines.filter(l => 
+                l.p1id !== this.activePoint.id && l.p2id !== this.activePoint.id
+            );
+
+            // Теперь проверяем привязку только к "чужим" линиям
+            const lineSnap = MathDrawingEngine.getLineSnap(pos, potentialLines, el.points, 3);
+
+            if (lineSnap) {
+                // Магнит к чужой линии
+                this.activePoint.x = lineSnap.x;
+                this.activePoint.y = lineSnap.y;
+                this.activePoint.boundLineId = lineSnap.lineId;
+                this.activePoint.t = lineSnap.t;
+            } else if (this.activePoint.boundLineId) {
+                // Если точка уже была привязана, проверяем отрыв или скольжение
+                const currentLine = el.lines.find(l => l.id === this.activePoint.boundLineId);
+                const distToLine = currentLine ? MathDrawingEngine.getDistToLine(pos, currentLine, el.points) : 999;
+
+                if (distToLine > 5) {
+                    this.activePoint.boundLineId = null;
+                    this.activePoint.t = null;
+                    this.activePoint.x = MathDrawingEngine.smartSnap(pos.x);
+                    this.activePoint.y = MathDrawingEngine.smartSnap(pos.y);
+                } else {
+                    const slideSnap = MathDrawingEngine.getLineSnap(pos, [currentLine], el.points, 20);
+                    if (slideSnap) {
+                        this.activePoint.x = slideSnap.x;
+                        this.activePoint.y = slideSnap.y;
+                        this.activePoint.t = slideSnap.t;
                     }
                 }
-            });
-        }
+            } else {
+                // Обычное свободное движение
+                this.activePoint.x = MathDrawingEngine.smartSnap(pos.x);
+                this.activePoint.y = MathDrawingEngine.smartSnap(pos.y);
+            }
+
+            // Обновляем только те точки, которые реально зависят от движения этой вершины
+            const affectedLineIds = el.lines
+                .filter(l => l.p1id === this.activePoint.id || l.p2id === this.activePoint.id)
+                .map(l => l.id);
+
+            if (affectedLineIds.length > 0) {
+                el.points.forEach(p => {
+                    if (p.boundLineId && affectedLineIds.includes(p.boundLineId)) {
+                        MathDrawingEngine.updateConstrainedPoint(p, el.points, el.lines);
+                    }
+                });
+            }
+        }		
+		
     },
 
     handleEnd() {
         clearTimeout(this.tapTimer);
         const el = MathDrawingCore.elements;
 		const now = Date.now();
+		const lineSnap = MathDrawingEngine.getLineSnap(this.lastPos, el.lines, el.points); // Привязка точки к существующей линии
 		
-		
-		if (this.draggingLabel) {
+		// ИСПРАВЛЕНИЕ БАГА ПОДПИСИ: Очищаем draggingLabel всегда при отпускании
+        if (this.draggingLabel) {
             MathDrawingCore.save();
             this.draggingLabel = null;
         }
-
-        if (this.isDragging && this.activePoint) {
-            // "Слипание" точек при завершении перетаскивания
-            const target = el.points.find(p => p.id !== this.activePoint.id && Math.hypot(p.x - this.activePoint.x, p.y - this.activePoint.y) < 15);
-            if (target) {
-                el.lines.forEach(l => { if (l.p1id === this.activePoint.id) l.p1id = target.id; if (l.p2id === this.activePoint.id) l.p2id = target.id; });
-                el.angles.forEach(a => { if (a.p1 === this.activePoint.id) a.p1 = target.id; if (a.p2 === this.activePoint.id) a.p2 = target.id; if (a.p3 === this.activePoint.id) a.p3 = target.id; });
-                el.points = el.points.filter(p => p.id !== this.activePoint.id);
-				
-				// Если после перемещения начало и конец линии совпали (длина 0), удаляем её
-				if (el.lines) {
-					el.lines = el.lines.filter(l => l.p1id !== l.p2id);
-				}
-				
-            }
-            MathDrawingCore.save();
-        } 
-        // Создание линии, если мы "вытянули" её из точки
-        else if (this.activePoint && !this.isDragging && Math.hypot(this.lastPos.x - this.startPos.x, this.lastPos.y - this.startPos.y) > 20) {
-            const inter = MathDrawingEngine.findIntersection(this.lastPos, el);
-            let target = inter ? { ...inter, id: Math.random(), name: this.generateName() } : { x: MathDrawingEngine.snap(this.lastPos.x), y: MathDrawingEngine.snap(this.lastPos.y), id: Math.random(), parents: [], name: this.generateName() };
-            
-            const existing = el.points.find(p => Math.hypot(p.x - target.x, p.y - target.y) < 15);
-            if (existing) target = existing; else el.points.push(target);
-            
-            if (target.id !== this.activePoint.id) {
-                el.lines.push({ id: Math.random(), p1id: this.activePoint.id, p2id: target.id, tick: null, isDashed: false, isBold: false, name: '' });
-                MathDrawingCore.save();
-            }
 		
-        }
+		// С привязкой точки к линии
+		if (this.activePoint && !this.isDragging && Math.hypot(this.lastPos.x - this.startPos.x, this.lastPos.y - this.startPos.y) > 20) {
+			const el = MathDrawingCore.elements;
+			
+			// 1. ПРИОРИТЕТ: Ищем существующую точку в радиусе 15px
+			let target = el.points.find(p => Math.hypot(p.x - this.lastPos.x, p.y - this.lastPos.y) < 15);
+
+			if (!target) {
+				// 2. ВТОРОЙ ПРИОРИТЕТ: Ищем привязку к линии (3 пикселя)
+				const lineSnap = MathDrawingEngine.getLineSnap(this.lastPos, el.lines, el.points);
+				
+				if (lineSnap) {
+					target = { 
+						id: Math.random(), 
+						x: lineSnap.x, 
+						y: lineSnap.y, 
+						name: this.generateName(),
+						parents: [],
+						boundLineId: lineSnap.lineId, // Сохраняем ID линии для привязки
+						t: lineSnap.t                 // Сохраняем пропорцию
+					};
+				} else {
+					// 3. ПОСЛЕДНИЙ ВАРИАНТ: Привязка к сетке
+					target = { 
+						id: Math.random(), 
+						x: MathDrawingEngine.snap(this.lastPos.x), 
+						y: MathDrawingEngine.snap(this.lastPos.y), 
+						name: this.generateName(),
+						parents: []
+					};
+				}
+				el.points.push(target);
+			}
+			
+			// Создание линии (код дубликатов, который мы чинили ранее)
+			if (target.id !== this.activePoint.id) {
+				const alreadyExists = el.lines.find(l => 
+					(l.p1id === this.activePoint.id && l.p2id === target.id) || 
+					(l.p1id === target.id && l.p2id === this.activePoint.id)
+				);
+
+				if (!alreadyExists) {
+					el.lines.push({ 
+						id: Math.random(), p1id: this.activePoint.id, p2id: target.id, 
+						tick: null, isDashed: false, isBold: false, name: '' 
+					});
+					MathDrawingCore.save();
+				}
+			}
+		}
 		
 		
 		// Проверка на двойной клик (интервал менее 300мс)
@@ -231,14 +291,40 @@ const MathDrawingEvents = {
 
         // Логика завершения создания линии (тянем-бросаем)
         if (this.activePoint && !this.isDragging && Math.hypot(this.lastPos.x - this.startPos.x, this.lastPos.y - this.startPos.y) > 20) {
-            const inter = MathDrawingEngine.findIntersection(this.lastPos, el);
-            let target = inter ? { ...inter, id: Math.random(), name: this.generateName() } : { x: MathDrawingEngine.snap(this.lastPos.x), y: MathDrawingEngine.snap(this.lastPos.y), id: Math.random(), parents: [], name: this.generateName() };
+            const el = MathDrawingCore.elements;
             
-            const existing = el.points.find(p => Math.hypot(p.x - target.x, p.y - target.y) < 15);
-            if (existing) target = existing; else el.points.push(target);
+            // 1. Ищем существующую точку в радиусе 15px
+            let target = el.points.find(p => Math.hypot(p.x - this.lastPos.x, p.y - this.lastPos.y) < 15);
+
+            if (!target) {
+                // 2. Если точки нет, ищем привязку к линии (3 пикселя)
+                const lineSnap = MathDrawingEngine.getLineSnap(this.lastPos, el.lines, el.points);
+                
+                if (lineSnap) {
+                    target = { 
+                        x: lineSnap.x, 
+                        y: lineSnap.y, 
+                        id: Math.random(), 
+                        parents: [], 
+                        name: this.generateName(),
+                        boundLineId: lineSnap.lineId, 
+                        t: lineSnap.t 
+                    };
+                } else {
+                    // 3. Если и линии нет, просто привязываемся к сетке
+                    target = { 
+                        x: MathDrawingEngine.snap(this.lastPos.x), 
+                        y: MathDrawingEngine.snap(this.lastPos.y), 
+                        id: Math.random(), 
+                        parents: [], 
+                        name: this.generateName() 
+                    };
+                }
+                el.points.push(target);
+            }
             
+            // Создание линии между активной и целевой точкой
             if (target.id !== this.activePoint.id) {
-                // ПРОВЕРКА НА ДУБЛИКАТ
                 const alreadyExists = el.lines.find(l => 
                     (l.p1id === this.activePoint.id && l.p2id === target.id) || 
                     (l.p1id === target.id && l.p2id === this.activePoint.id)
@@ -263,6 +349,7 @@ const MathDrawingEvents = {
        
         this.isDragging = false;
         this.activePoint = null;
+		this.draggingLabel = null; // Дублирующая защита
     },
 
 	renderLoop() {
