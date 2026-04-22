@@ -95,6 +95,14 @@ const MathDrawingRender = {
             l.lastBox = box;
             this.drawLabelBox(ctx, box, l.name, '#636e72');
         };
+		
+		if (l.isDashed) {
+            ctx.setLineDash([5, 5]);
+        } else {
+            ctx.setLineDash([]);
+        }
+		
+		ctx.stroke();
     },
 
     drawTicks(ctx, p1, p2, type) {

@@ -151,7 +151,52 @@ const MathDrawingEngine = {
         }
 
         return null;
-    }
+    },
+	
+		// В MathDrawingEngine.js (опционально, для красоты кода)
+	smartSnap(val, threshold = 3) {
+		const snapped = Math.round(val / this.GRID) * this.GRID;
+		return Math.abs(val - snapped) < threshold ? snapped : val;
+	},
+	
+	/** Привязка точек к сетке при свободном перемещении точки*/
+    getLineSnap(pos, lines, points, threshold = 3) {
+        for (let l of lines) {
+            const p1 = points.find(p => p.id === l.p1id);
+            const p2 = points.find(p => p.id === l.p2id);
+            if (!p1 || !p2) continue;
+
+            // Находим проекцию точки на отрезок и расстояние до неё
+            const dist = this.getDistToLine(pos, l, points);
+            if (dist < threshold) {
+                // Вычисляем t (параметр от 0 до 1 вдоль линии)
+                const L2 = (p2.x - p1.x)**2 + (p2.y - p1.y)**2;
+                let t = ((pos.x - p1.x) * (p2.x - p1.x) + (pos.y - p1.y) * (p2.y - p1.y)) / L2;
+                t = Math.max(0, Math.min(1, t));
+                
+                return { 
+                    x: p1.x + t * (p2.x - p1.x), 
+                    y: p1.y + t * (p2.y - p1.y), 
+                    lineId: l.id, 
+                    t: t 
+                };
+            }
+        }
+        return null;
+    },
+
+    /** Пересчет координат точки, привязанной к линии */
+    updateConstrainedPoint(p, points, lines) {
+        if (!p.boundLineId) return;
+        const l = lines.find(line => line.id === p.boundLineId);
+        if (!l) return;
+        const p1 = points.find(pt => pt.id === l.p1id);
+        const p2 = points.find(pt => pt.id === l.p2id);
+        if (p1 && p2) {
+            p.x = p1.x + p.t * (p2.x - p1.x);
+            p.y = p1.y + p.t * (p2.y - p1.y);
+        }
+    },
 	
 	
 };

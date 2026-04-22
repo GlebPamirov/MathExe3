@@ -148,8 +148,10 @@ const MathDrawingEvents = {
         }
 
         if (this.isDragging && this.activePoint) {
-            this.activePoint.x = pos.x;
-            this.activePoint.y = pos.y;
+            this.activePoint.x = MathDrawingEngine.smartSnap(this.lastPos.x);
+			this.activePoint.y = MathDrawingEngine.smartSnap(this.lastPos.y);
+			
+			
             
             // Динамическое обновление зависимых точек (пересечений)
             MathDrawingCore.elements.points.forEach(p => {
@@ -204,9 +206,9 @@ const MathDrawingEvents = {
                 el.lines.push({ id: Math.random(), p1id: this.activePoint.id, p2id: target.id, tick: null, isDashed: false, isBold: false, name: '' });
                 MathDrawingCore.save();
             }
-			
-			
+		
         }
+		
 		
 		// Проверка на двойной клик (интервал менее 300мс)
         if (now - this.lastTapTime < 300) {
@@ -236,10 +238,28 @@ const MathDrawingEvents = {
             if (existing) target = existing; else el.points.push(target);
             
             if (target.id !== this.activePoint.id) {
-                el.lines.push({ id: Math.random(), p1id: this.activePoint.id, p2id: target.id, tick: null, isDashed: false, isBold: false, name: '' });
-                MathDrawingCore.save();
+                // ПРОВЕРКА НА ДУБЛИКАТ
+                const alreadyExists = el.lines.find(l => 
+                    (l.p1id === this.activePoint.id && l.p2id === target.id) || 
+                    (l.p1id === target.id && l.p2id === this.activePoint.id)
+                );
+
+                if (!alreadyExists) {
+                    el.lines.push({ 
+                        id: Math.random(), 
+                        p1id: this.activePoint.id, 
+                        p2id: target.id, 
+                        tick: null, 
+                        isDashed: false, 
+                        isBold: false, 
+                        name: '' 
+                    });
+                    MathDrawingCore.save();
+                } 
             }
         }
+		
+		
        
         this.isDragging = false;
         this.activePoint = null;
