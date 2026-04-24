@@ -121,19 +121,25 @@ const MathDrawingRender = {
 
     drawAngle(ctx, ang, points) {
         const p1 = points.find(p => p.id === ang.p1);
-        const p2 = points.find(p => p.id === ang.p2);
+        const p2 = points.find(p => p.id === ang.p2); // Вершина
         const p3 = points.find(p => p.id === ang.p3);
         if (!p1 || !p2 || !p3) return;
 
-        let a1 = Math.atan2(p1.y - p2.y, p1.x - p2.x);
-        let a3 = Math.atan2(p3.y - p2.y, p3.x - p2.x);
-        let diff = (a3 - a1 + Math.PI * 2) % (Math.PI * 2);
-        if (diff > Math.PI) { [a1, a3] = [a3, a1]; diff = Math.PI * 2 - diff; }
+        const a1 = Math.atan2(p1.y - p2.y, p1.x - p2.x);
+        const a3 = Math.atan2(p3.y - p2.y, p3.x - p2.x);
+
+        let diff = a3 - a1;
+        while (diff < 0) diff += Math.PI * 2;
+        if (diff > Math.PI) diff -= Math.PI * 2;
+		
+		ctx.save(); // Рекомендую использовать save/restore для изоляции стилей
+		ctx.setLineDash([]); // СБРОС ПУНКТИРА
+
+        ctx.strokeStyle = '#0984e3';
+        ctx.lineWidth = 1.5;
         
-        ctx.strokeStyle = '#0984e3'; ctx.lineWidth = 1.5;
-        
-        // Прямой угол или дуги
-        if (Math.abs(diff - Math.PI / 2) < 0.1) {
+        // 1. Отрисовка дуг или прямого угла
+        if (Math.abs(diff - Math.PI / 2) < 0.1 || Math.abs(diff + Math.PI / 2) < 0.1) {
             const d = 15;
             ctx.beginPath();
             ctx.moveTo(p2.x + Math.cos(a1) * d, p2.y + Math.sin(a1) * d);
@@ -141,16 +147,32 @@ const MathDrawingRender = {
             ctx.lineTo(p2.x + Math.cos(a3) * d, p2.y + Math.sin(a3) * d);
             ctx.stroke();
         } else {
-            for (let n = 0; n < ang.arcCount; n++) {
-                ctx.beginPath(); ctx.arc(p2.x, p2.y, 18 + n * 4, a1, a3, false); ctx.stroke();
+            for (let n = 0; n < (ang.arcCount || 1); n++) {
+                ctx.beginPath();
+                ctx.arc(p2.x, p2.y, 18 + n * 4, a1, a1 + diff, diff < 0);
+                ctx.stroke();
             }
         }
 
-        if (ang.greek) {
-            const midA = a1 + diff / 2;
-            ctx.fillStyle = '#0984e3'; ctx.font = '16px serif';
-            ctx.fillText(ang.greek, p2.x + Math.cos(midA) * 38 - 4, p2.y + Math.sin(midA) * 38 + 5);
-        }
+        // 2. "Умная" отрисовка подписи (label)
+        const labelPos = MathDrawingEngine.getAngleLabelPos(ang, points, 40);
+
+		if (ang.greek || ang.degree) {
+			const text = ang.greek || ang.degree;
+			ctx.fillStyle = '#0984e3';
+			ctx.font = '16px serif';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.fillText(text, labelPos.x, labelPos.y);
+			
+			// Сохраняем бокс для клика (выбора подписи)
+			ang.lastBox = { 
+				x: labelPos.x - 20, 
+				y: labelPos.y - 20, 
+				w: 40, 
+				h: 40 
+			};
+		}
     },
 
     drawTempLine(ctx, from, to) {

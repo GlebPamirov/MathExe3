@@ -30,27 +30,63 @@ const MathDrawingUI = {
         if (type === 'point') {
             content.innerHTML = `
                 <div class="menu-row"> 
-					<label> Обозначение </label>
+					<label> 
+						Обозначение 
+					</label>
 					<input type="text" value="${obj.name}" class="menu-input" oninput="MathDrawingUI.menuTarget.name=this.value">
 				</div>
                 <div class="menu-row">
 					<button class="btn-sm" onclick="MathDrawingUI.menuTarget.isHollow=!MathDrawingUI.menuTarget.isHollow;MathDrawingCore.save();">
-						<label> Выколоть / Закрасить </label>
+						<label> 
+							Выколоть / Закрасить 
+						</label>
+					</button>
+				</div>
+				<div class="menu-row">
+					<button class="btn-sm" onclick="MathDrawingEngine.splitLineAtPoint()">
+						Разделить отрезок
 					</button>
 				</div>`;
-        } else if (type === 'angle') {
-			
-            content.innerHTML = `
+        } 
+		
+		if (type === 'angle') {
+			content.innerHTML = `
                 <div class="menu-row">
-					Буква: ${this.greeks.map(g => `<button class="btn-sm" onclick="MathDrawingUI.menuTarget.greek='${g}';MathDrawingCore.save();">${g}</button>`).join('')}
-				</div>
+                    <label>Греч. символ:</label>
+                    <div class="symbol-grid">
+                        ${this.greeks.map(g => `
+                            <button class="btn-sm ${obj.greek === g ? 'active' : ''}" 
+                                onclick="MathDrawingUI.setAngleLabel('greek', '${g}')">${g}</button>
+                        `).join('')}
+                    </div>
+                </div>
+                <div class="menu-row">
+                    <label>Номер угла:</label>
+                    <div class="symbol-grid">
+                        <button class="btn-sm" onclick="MathDrawingUI.setAngleLabel('digit', '1')">1</button>
+						<button class="btn-sm" onclick="MathDrawingUI.setAngleLabel('digit', '2')">2</button>
+						<button class="btn-sm" onclick="MathDrawingUI.setAngleLabel('digit', '3')">3</button>
+						<button class="btn-sm" onclick="MathDrawingUI.setAngleLabel('digit', '4')">4</button>
+                    </div>
+                </div>
+                <div class="menu-row">
+                    <label>Градусы:</label>
+                    <input type="number" placeholder="°" class="menu-input" style="width:60px"
+                        onchange="MathDrawingUI.setAngleLabel('degree', this.value)">
+                </div>
+                <div class="menu-row">
+                    <label>Радианы:</label>
+                    <button class="btn-sm" onclick="MathDrawingUI.setAngleLabel('greek', 'π')"> π </button>
+                </div>
                 <div class="menu-row">
 					Дуги: 
 					<button class="btn-sm" onclick="MathDrawingUI.menuTarget.arcCount=1;MathDrawingCore.save();"> 1 </button>
 					<button class="btn-sm" onclick="MathDrawingUI.menuTarget.arcCount=2;MathDrawingCore.save();"> 2 </button>
 					<button class="btn-sm" onclick="MathDrawingUI.menuTarget.arcCount=3;MathDrawingCore.save();"> 3 </button>
 				</div>`;
-        } else if (type === 'line') {
+        } 
+		
+		if (type === 'line') {
             content.innerHTML = `
                 <div class="menu-row"> 
 					<label> Обозначение </label>
@@ -63,7 +99,10 @@ const MathDrawingUI = {
 					<button class="btn-sm" onclick="MathDrawingUI.menuTarget.isBold=!MathDrawingUI.menuTarget.isBold;MathDrawingCore.save();">
 						Жирная 
 					</button>
-					</div>
+					<button class="btn-sm" onclick="MathDrawingEngine.addMidpoint()">
+						Пополам
+					</button>
+				</div>
                 <div class="menu-row">
 					Засечки: 
 					<button class="btn-sm" onclick="MathDrawingUI.setTick('I')">I</button>
@@ -75,6 +114,8 @@ const MathDrawingUI = {
         menu.style.display = 'flex'; 
         menu.style.left = Math.min(pos.x, 220) + 'px';
         menu.style.top = Math.min(pos.y, 180) + 'px';
+		
+		
     },
 
     setTick(t) {
@@ -88,28 +129,62 @@ const MathDrawingUI = {
     },
 
 	/** Удаление объекта через меню или ластик */
-    deleteTarget() {
-        const target = this.menuTarget;
-        if (!target) return;
+    deleteTarget(clickPos) {
+		const target = this.menuTarget;
+		if (!target) return;
 
-        const el = MathDrawingCore.elements;
+		const el = MathDrawingCore.elements;
+		// Используем переданные координаты от ластика или позицию последнего клика
+		const pos = clickPos || MathDrawingEvents.lastPos;
+
+		// 1. Логика для УГЛА
+		if (target.p1 && target.p2 && target.p3) {
+			const hitLabel = target.lastBox && 
+				pos.x >= target.lastBox.x && pos.x <= target.lastBox.x + target.lastBox.w &&
+				pos.y >= target.lastBox.y && pos.y <= target.lastBox.y + target.lastBox.h;
+
+			if (hitLabel) {
+				target.greek = null;
+				target.degree = null;
+			} else {
+				MathDrawingCore.elements.angles = el.angles.filter(a => a.id !== target.id);
+			}
+		} 
+		// 2. Логика для ТОЧКИ (важно: else if теперь на своем месте)
+		else if (target.x !== undefined && target.y !== undefined) {
+			MathDrawingCore.elements.points = el.points.filter(p => p.id !== target.id);
+			MathDrawingCore.elements.lines = el.lines.filter(l => l.p1id !== target.id && l.p2id !== target.id);
+			MathDrawingCore.elements.angles = el.angles.filter(a => a.p1 !== target.id && a.p2 !== target.id && a.p3 !== target.id);
+		}
+		// 3. Логика для ЛИНИИ
+		else if (target.p1id) {
+			MathDrawingCore.elements.lines = el.lines.filter(l => l.id !== target.id);
+		}
+
+		MathDrawingCore.save();
+		this.closeMenu();
+	},
+	
+	/** Универсальный метод для установки подписи угла */
+    setAngleLabel(type, value) {
+        if (!this.menuTarget) return;
         
-        // 1. Если это точка — удаляем саму точку и все связанные с ней линии и углы
-        el.points = el.points.filter(p => p.id !== target.id);
-        el.lines = el.lines.filter(l => l.p1id !== target.id && l.p2id !== target.id);
-        el.angles = el.angles.filter(a => a.p1 !== target.id && a.p2 !== target.id && a.p3 !== target.id);
-
-        // 2. Если это линия (target имеет p1id)
-        if (target.p1id) {
-            el.lines = el.lines.filter(l => l.id !== target.id);
+        if (type === 'greek') {
+            // Если нажали на ту же кнопку, снимаем подпись, иначе ставим новую
+            this.menuTarget.greek = (this.menuTarget.greek === value) ? null : value;
+        } 
+        else if (type === 'degree') {
+            // Автоматически добавляем знак градуса, если введено число
+            this.menuTarget.greek = value ? value + '°' : null;
         }
-
-        // 3. Если это угол (target имеет p1, p2, p3)
-        if (target.p2) {
-            el.angles = el.angles.filter(a => a.id !== target.id);
+		
+		else if (type === 'digit') {
+            // Просто нумирация углов. Здесь greek - это просто строчный символ
+            this.menuTarget.greek = (this.menuTarget.greek === value) ? null : value;
         }
 
         MathDrawingCore.save();
-        this.closeMenu();
+        this.closeMenu(); // Закрываем меню для подтверждения
     },
+	
 };

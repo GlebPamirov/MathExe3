@@ -13,6 +13,7 @@ const MathDrawingEvents = {
     selectedForAngle: [],
     alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
 	draggingLabel: null, // Новое состояние
+	
 
 	init(canvasId) {
         this.canvas = document.getElementById(canvasId);
@@ -51,6 +52,7 @@ const MathDrawingEvents = {
         const pos = this.getPos(e);
         this.startPos = this.lastPos = pos;
         const el = MathDrawingCore.elements;
+		const target = MathDrawingEngine.findTarget(pos, el); // Выбор угла по трем точкам
 		
 		// 1. Проверяем попадание в рамки подписей (у них должен быть сохранен lastBox)
         const all = [...el.points, ...el.lines];
@@ -77,17 +79,74 @@ const MathDrawingEvents = {
 		
         this.activePoint = hitP;
 
-        // Режим ластика для точки и линии
-        if (MathDrawingUI.currentMode === 'eraser') {
-            if (hitP) {
-                MathDrawingUI.menuTarget = hitP;
-                MathDrawingUI.deleteTarget();
-            } else if (hitL) {
-                MathDrawingUI.menuTarget = hitL;
-                MathDrawingUI.deleteTarget();
-            }
-            return;
-        }
+        // Режим ластика для точки, линии и угла
+		if (MathDrawingUI.currentMode === 'eraser') {
+			const el = MathDrawingCore.elements;
+
+			// 1. Проверка ТОЧЕК
+			const pointTarget = el.points.find(p => MathDrawingEngine.getDist(pos, p) < 15);
+			if (pointTarget) {
+				MathDrawingUI.menuTarget = pointTarget;
+				MathDrawingUI.deleteTarget(pos);
+				return;
+			}
+
+			// 2. Проверка УГЛОВ (подпись или дуги)
+			const angleTarget = el.angles.find(ang => {
+				const hitLabel = ang.lastBox && 
+					pos.x >= ang.lastBox.x && pos.x <= ang.lastBox.x + ang.lastBox.w &&
+					pos.y >= ang.lastBox.y && pos.y <= ang.lastBox.y + ang.lastBox.h;
+				
+				const vertex = el.points.find(p => p.id === ang.p2);
+				const hitArcs = vertex && MathDrawingEngine.getDist(pos, vertex) < 45;
+				return hitLabel || hitArcs;
+			});
+			if (angleTarget) {
+				MathDrawingUI.menuTarget = angleTarget;
+				MathDrawingUI.deleteTarget(pos);
+				return;
+			}
+
+			// 3. Проверка ЛИНИЙ
+			const lineTarget = el.lines.find(l => MathDrawingEngine.getDistToLine(pos, l, el.points) < 12);
+			if (lineTarget) {
+				MathDrawingUI.menuTarget = lineTarget;
+				MathDrawingUI.deleteTarget(pos);
+				return;
+			}
+			return;
+		}
+		
+			// Логика режима "Угол" по трем точкам
+		if (MathDrawingUI.currentMode === 'angle') {
+			if (target && !target.p1id) { // Проверяем, что это точка (у линий есть p1id)
+				// Добавляем точку в список выбора, если её там еще нет
+				if (!this.selectedForAngle.includes(target.id)) {
+					this.selectedForAngle.push(target.id);
+				}
+
+				// Если выбрано 3 точки — создаем угол
+				if (this.selectedForAngle.length === 3) {
+					const newAngle = {
+						id: Math.random(),
+						p1: this.selectedForAngle[0],
+						p2: this.selectedForAngle[1], // Вершина
+						p3: this.selectedForAngle[2],
+						arcCount: 1,
+						arcName: "α",
+						isRight: false
+					};
+					el.angles.push(newAngle);
+					MathDrawingCore.save();
+					
+					this.selectedForAngle = []; // Сброс выбора
+					MathDrawingUI.toggleMode(null); // Выход из режима после создания
+				}
+			}
+			return;
+		}
+		
+		
 
         // Логика создания точки/линии
         this.tapTimer = setTimeout(() => {
@@ -111,6 +170,25 @@ const MathDrawingEvents = {
                 }
             }
         }, 200); // Уменьшил задержку для отзывчивости
+		
+		
+		const angleTarget = el.angles.find(ang => {
+			// 1. Проверка попадания в бокс подписи (уже есть)
+			if (ang.lastBox && this.isPointInBox(pos, ang.lastBox)) return true;
+
+			// 2. Проверка попадания в "активную зону" вершины (40 пикселей)
+			const vertex = el.points.find(p => p.id === ang.p2);
+			if (vertex) {
+				const distToVertex = MathDrawingEngine.getDist(pos, vertex);
+				if (distToVertex < 40) return true; // Увеличенная область захвата
+			}
+			return false;
+		});
+
+		if (angleTarget) {
+			this.openMenu(angleTarget, pos, 'angle');
+			return;
+		}
 		
     },
 
@@ -202,6 +280,25 @@ const MathDrawingEvents = {
                     }
                 });
             }
+			
+			// Находим все линии, связанные с этой точкой
+			const relatedLines = el.lines.filter(l => 
+				l.p1id === this.activePoint.id || l.p2id === this.activePoint.id
+			);
+
+			relatedLines.forEach(l => {
+				// Если у линии есть засечка, и точка привязана к "середине"
+				if (l.tick) {
+					// Проверяем, находится ли точка всё еще в математическом центре
+					const p1 = el.points.find(p => p.id === l.p1id);
+					const p2 = el.points.find(p => p.id === l.p2id);
+					
+					// Если точка (любой конец линии) ушла от изначального "центрального" состояния
+					// Или если мы хотим удалять засечки при ЛЮБОМ ручном изменении геометрии:
+					l.tick = null;
+				}
+			});
+			
         }		
 		
     },
@@ -267,6 +364,17 @@ const MathDrawingEvents = {
 					MathDrawingCore.save();
 				}
 			}
+			
+			if (this.draggingLabel && this.draggingLabel.type === 'angle') {
+				const ang = this.draggingLabel.obj;
+				const dx = this.lastPos.x - this.startPos.x;
+				const dy = this.lastPos.y - this.startPos.y;
+
+				// Ограничение в 70 пикселей от начальной точки
+				if (Math.hypot(dx, dy) < 70) {
+					ang.labelOffset = { x: dx, y: dy };
+				}
+			}
 		}
 		
 		
@@ -277,7 +385,7 @@ const MathDrawingEvents = {
                 // Определяем тип объекта для сообщения
                 let typeName = "point";
                 if (target.p1id) typeName = "line";
-                if (target.arcCount !== undefined) typeName = "angle";
+                if (target.arcCount) typeName = "angle";
                 
                 MathDrawingUI.openMenu(target, this.lastPos, typeName);
                 
@@ -344,6 +452,8 @@ const MathDrawingEvents = {
                 } 
             }
         }
+		
+		
 		
 		
        

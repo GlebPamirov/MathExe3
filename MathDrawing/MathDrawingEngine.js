@@ -145,7 +145,7 @@ const MathDrawingEngine = {
         if (elements.angles) {
             const angle = elements.angles.find(a => {
                 const p2 = elements.points.find(pt => pt.id === a.p2);
-                return p2 && this.getDist(pos, p2) < 20; // Клик рядом с вершиной угла
+                return p2 && this.getDist(pos, p2) < 30; // Клик рядом с вершиной угла
             });
             if (angle) return angle;
         }
@@ -198,5 +198,156 @@ const MathDrawingEngine = {
         }
     },
 	
+		// Добавить в объект MathDrawingEngine
+	getAngleLabelPos(ang, points, distance = 30) {
+		const p1 = points.find(p => p.id === ang.p1);
+		const p2 = points.find(p => p.id === ang.p2); // Вершина
+		const p3 = points.find(p => p.id === ang.p3);
+		if (!p1 || !p2 || !p3) return { x: 0, y: 0 };
+
+		// Углы векторов
+		const a1 = Math.atan2(p1.y - p2.y, p1.x - p2.x);
+		const a3 = Math.atan2(p3.y - p2.y, p3.x - p2.x);
+		
+		let diff = a3 - a1;
+		while (diff < 0) diff += Math.PI * 2;
+		if (diff > Math.PI) diff -= Math.PI * 2;
+
+		// Угол биссектрисы
+		const bisectorA = a1 + diff / 2;
+
+		// Базовая позиция (биссектриса + ручное смещение, если есть)
+		const basePos = {
+			x: p2.x + Math.cos(bisectorA) * distance,
+			y: p2.y + Math.sin(bisectorA) * distance
+		};
+
+		return ang.labelOffset ? 
+			{ x: basePos.x + ang.labelOffset.x, y: basePos.y + ang.labelOffset.y } : 
+			basePos;
+	},
+	
+	/** Добавление точки в середину отрезка */
+	addMidpoint() {
+		const line = MathDrawingUI.menuTarget;
+		if (!line) return;
+
+		const el = MathDrawingCore.elements;
+		const p1 = el.points.find(p => p.id === line.p1id);
+		const p2 = el.points.find(p => p.id === line.p2id);
+
+		if (p1 && p2) {
+			const midX = (p1.x + p2.x) / 2;
+			const midY = (p1.y + p2.y) / 2;
+
+			const newPoint = {
+				id: Math.random(),
+				x: midX,
+				y: midY,
+				name: MathDrawingEvents.alphabet[el.points.length % 26],
+				// ПРИВЯЗКА:
+				boundLineId: line.id, 
+				t: 0.5 // Сохраняем положение как коэффициент (0.5 = ровно центр)
+			};
+
+			el.points.push(newPoint);
+			MathDrawingCore.save();
+			MathDrawingUI.closeMenu();
+		}
+	},
+
+	/** * НОВЫЙ МЕТОД: Обновление всех привязанных точек.
+	 * Его нужно вызывать в MathDrawingEvents.js внутри handleMove
+	 */
+	updateBoundPoints() {
+		const el = MathDrawingCore.elements;
+		el.points.forEach(p => {
+			if (p.boundLineId) {
+				const line = el.lines.find(l => l.id === p.boundLineId);
+				if (line) {
+					const p1 = el.points.find(pt => pt.id === line.p1id);
+					const p2 = el.points.find(pt => pt.id === line.p2id);
+					
+					if (p1 && p2) {
+						// Пересчитываем X и Y на основе коэффициента t
+						p.x = p1.x + (p2.x - p1.x) * (p.t || 0.5);
+						p.y = p1.y + (p2.y - p1.y) * (p.t || 0.5);
+					}
+				} else {
+					// Если линия была удалена, снимаем привязку, чтобы точка не зависла
+					delete p.boundLineId;
+					delete p.t;
+				}
+			}
+		});
+	},
+	
+		/** * НОВЫЙ МЕТОД: Обновление всех привязанных точек.
+	 * Его нужно вызывать в MathDrawingEvents.js внутри handleMove
+	 */
+	updateBoundPoints() {
+		const el = MathDrawingCore.elements;
+		el.points.forEach(p => {
+			if (p.boundLineId) {
+				const line = el.lines.find(l => l.id === p.boundLineId);
+				if (line) {
+					const p1 = el.points.find(pt => pt.id === line.p1id);
+					const p2 = el.points.find(pt => pt.id === line.p2id);
+					
+					if (p1 && p2) {
+						// Пересчитываем X и Y на основе коэффициента t
+						p.x = p1.x + (p2.x - p1.x) * (p.t || 0.5);
+						p.y = p1.y + (p2.y - p1.y) * (p.t || 0.5);
+					}
+				} else {
+					// Если линия была удалена, снимаем привязку, чтобы точка не зависла
+					delete p.boundLineId;
+					delete p.t;
+				}
+			}
+		});
+	},
+	
+	/** Разделение одного отрезка на два в месте нахождения точки */
+	splitLineAtPoint() {
+		const point = MathDrawingUI.menuTarget;
+		if (!point) return;
+
+		const el = MathDrawingCore.elements;
+		
+		// Ищем линию, на которой лежит эта точка (не являясь её концом)
+		const lineToSplit = el.lines.find(l => {
+			if (l.p1id === point.id || l.p2id === point.id) return false;
+			
+			// Математическая проверка: лежит ли точка на отрезке
+			const p1 = el.points.find(p => p.id === l.p1id);
+			const p2 = el.points.find(p => p.id === l.p2id);
+			if (!p1 || !p2) return false;
+			
+			const d = this.getDistToLine(point, l, el.points);
+			return d < 2; // Порог чувствительности
+		});
+
+		if (lineToSplit) {
+			const oldP2id = lineToSplit.p2id;
+			
+			// 1. Укорачиваем старую линию до нашей точки
+			lineToSplit.p2id = point.id;
+			
+			// 2. Создаем новую линию от нашей точки до старого конца
+			el.lines.push({
+				id: Math.random(),
+				p1id: point.id,
+				p2id: oldP2id,
+				tick: null,
+				isDashed: lineToSplit.isDashed,
+				isBold: lineToSplit.isBold,
+				name: ''
+			});
+
+			MathDrawingCore.save();
+			MathDrawingUI.closeMenu();
+		}
+	}
 	
 };
