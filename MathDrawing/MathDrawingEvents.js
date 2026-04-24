@@ -308,6 +308,53 @@ const MathDrawingEvents = {
         const el = MathDrawingCore.elements;
 		const now = Date.now();
 		const lineSnap = MathDrawingEngine.getLineSnap(this.lastPos, el.lines, el.points); // Привязка точки к существующей линии
+		const pos = this.lastPos;
+		
+		if (this.isDragging && this.activePoint) {
+			// Ищем точку, на которую мы "наступили" (кроме самой себя)
+			const targetPoint = el.points.find(p => 
+				p.id !== this.activePoint.id && 
+				MathDrawingEngine.getDist(pos, p) < 15
+			);
+
+			if (targetPoint) {
+				const oldId = this.activePoint.id;
+				const newId = targetPoint.id;
+
+				// 1. Перекидываем линии на оставшуюся точку
+				el.lines.forEach(l => {
+					if (l.p1id === oldId) l.p1id = newId;
+					if (l.p2id === oldId) l.p2id = newId;
+				});
+
+				// 2. Перекидываем углы
+				el.angles.forEach(a => {
+					if (a.p1 === oldId) a.p1 = newId;
+					if (a.p2 === oldId) a.p2 = newId;
+					if (a.p3 === oldId) a.p3 = newId;
+				});
+
+				// --- ИСПРАВЛЕНИЕ ДУБЛИКАТОВ ---
+				el.lines = el.lines.filter((line, index, self) => {
+					// Удаляем петли (линия из точки в саму себя)
+					if (line.p1id === line.p2id) return false;
+
+					// Проверяем, нет ли такой же линии раньше в массиве
+					const firstIndex = self.findIndex(l => 
+						(l.p1id === line.p1id && l.p2id === line.p2id) || 
+						(l.p1id === line.p2id && l.p2id === line.p1id)
+					);
+					return index === firstIndex;
+				});
+
+				el.points = el.points.filter(p => p.id !== oldId);
+				
+				MathDrawingCore.save();
+				this.activePoint = null;
+				this.isDragging = false;
+				return; // Выходим, чтобы не сработала логика создания новой линии ниже
+			}
+		}
 		
 		// ИСПРАВЛЕНИЕ БАГА ПОДПИСИ: Очищаем draggingLabel всегда при отпускании
         if (this.draggingLabel) {
@@ -318,6 +365,7 @@ const MathDrawingEvents = {
 		// С привязкой точки к линии
 		if (this.activePoint && !this.isDragging && Math.hypot(this.lastPos.x - this.startPos.x, this.lastPos.y - this.startPos.y) > 20) {
 			const el = MathDrawingCore.elements;
+			
 			
 			// 1. ПРИОРИТЕТ: Ищем существующую точку в радиусе 15px
 			let target = el.points.find(p => Math.hypot(p.x - this.lastPos.x, p.y - this.lastPos.y) < 15);
