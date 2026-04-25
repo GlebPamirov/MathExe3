@@ -6,13 +6,17 @@ const MathDrawingRender = {
 
     /** Главный цикл отрисовки */
     draw(ctx, canvas, elements, state) {
+		
+		
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         this.drawGrid(ctx, canvas.width, canvas.height);
         
         // Порядок важен: сначала углы, потом линии, в конце точки
         elements.angles.forEach(ang => this.drawAngle(ctx, ang, elements.points));
+		elements.circles.forEach(c => this.drawCircle(ctx, c, elements.points));
         elements.lines.forEach(l => this.drawLine(ctx, l, elements.points));
         elements.points.forEach(p => this.drawPoint(ctx, p, state.selectedForAngle));
+		
 
         // Отрисовка "резиновой нити" при создании линии
         if (state.activePoint && !state.isDragging) {
@@ -175,10 +179,19 @@ const MathDrawingRender = {
 		}
     },
 
-    drawTempLine(ctx, from, to) {
-        ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y);
-        ctx.strokeStyle = '#0984e3'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
-    }, 
+	drawTempLine(ctx, p1, p2) {
+		if (MathDrawingUI.currentMode === 'circle') {
+			const r = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+			ctx.beginPath();
+			ctx.arc(p1.x, p1.y, r, 0, Math.PI * 2);
+			ctx.strokeStyle = 'rgba(9, 132, 227, 0.5)';
+			ctx.stroke();
+		} else { // Если не окружность, то ЛИНИЯ
+			ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); 
+			ctx.strokeStyle = '#0984e3'; ctx.setLineDash([5, 5]); ctx.stroke(); ctx.setLineDash([]);
+		}
+	},
+	
 	
 	drawLabelBox(ctx, box, text, color) {
         ctx.fillStyle = 'rgba(255,255,255,0.7)';
@@ -188,5 +201,30 @@ const MathDrawingRender = {
         ctx.textAlign = "left";
         ctx.textBaseline = "top";
         ctx.fillText(text, box.x + 4, box.y + 2);
-    }
+    },
+	
+	drawCircle(ctx, circle, points) {
+		const pCenter = points.find(p => p.id === circle.centerId);
+		const pRadius = points.find(p => p.id === circle.radiusId);
+		
+		if (!pCenter || !pRadius) return;
+
+		const radius = MathDrawingEngine.getDist(pCenter, pRadius);
+
+		ctx.save();
+		ctx.beginPath();
+		ctx.strokeStyle = '#2d3436';
+		ctx.lineWidth = 1.5;
+		ctx.arc(pCenter.x, pCenter.y, radius, 0, Math.PI * 2);
+		ctx.stroke();
+		
+		// Опционально: рисуем легкий пунктирный радиус при создании
+		ctx.setLineDash([5, 5]);
+		ctx.strokeStyle = '#dfe6e9';
+		ctx.beginPath();
+		ctx.moveTo(pCenter.x, pCenter.y);
+		ctx.lineTo(pRadius.x, pRadius.y);
+		ctx.stroke();
+		ctx.restore();
+	},
 };

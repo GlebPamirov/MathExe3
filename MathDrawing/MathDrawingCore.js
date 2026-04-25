@@ -6,6 +6,7 @@ const MathDrawingCore = {
         points: [], 
         lines: [], 
         angles: [], 
+		circles: [],
     },
     
     // Система истории для Undo/Redo

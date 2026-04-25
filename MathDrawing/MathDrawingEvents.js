@@ -316,52 +316,79 @@ const MathDrawingEvents = {
 		const now = Date.now();
 		const lineSnap = MathDrawingEngine.getLineSnap(this.lastPos, el.lines, el.points); // Привязка точки к существующей линии
 		const pos = this.lastPos;
+		const mode = MathDrawingUI.currentMode; // для окружности
+		const target = MathDrawingEngine.findTarget(pos, el)
+
+        if (target && this.activePoint) {
+            
+            // ДОБАВЛЯЕМ ПРОВЕРКУ ДЛЯ ОКРУЖНОСТИ
+            if (MathDrawingUI.currentMode === 'circle') {
+                if (target.id !== this.activePoint.id) {
+                    const alreadyExists = el.circles.find(c => 
+                        c.centerId === this.activePoint.id && c.radiusId === target.id
+                    );
+
+                    if (!alreadyExists) {
+                        el.circles.push({
+                            id: Math.random(),
+                            centerId: this.activePoint.id,
+                            radiusId: target.id
+                        });
+                        MathDrawingCore.save();
+                    }
+                }
+                // Прекращаем выполнение, чтобы не создалась линия поверх окружности
+                this.isDragging = false;
+                this.activePoint = null;
+                return; 
+            }
 		
-		if (this.isDragging && this.activePoint) {
-			// Ищем точку, на которую мы "наступили" (кроме самой себя)
-			const targetPoint = el.points.find(p => 
-				p.id !== this.activePoint.id && 
-				MathDrawingEngine.getDist(pos, p) < 15
-			);
+		
+			if (this.isDragging && this.activePoint) {
+				// Ищем точку, на которую мы "наступили" (кроме самой себя)
+				const targetPoint = el.points.find(p => 
+					p.id !== this.activePoint.id && 
+					MathDrawingEngine.getDist(pos, p) < 15
+				);
 
-			if (targetPoint) {
-				const oldId = this.activePoint.id;
-				const newId = targetPoint.id;
+				if (targetPoint) {
+					const oldId = this.activePoint.id;
+					const newId = targetPoint.id;
 
-				// 1. Перекидываем линии на оставшуюся точку
-				el.lines.forEach(l => {
-					if (l.p1id === oldId) l.p1id = newId;
-					if (l.p2id === oldId) l.p2id = newId;
-				});
+					// 1. Перекидываем линии на оставшуюся точку
+					el.lines.forEach(l => {
+						if (l.p1id === oldId) l.p1id = newId;
+						if (l.p2id === oldId) l.p2id = newId;
+					});
 
-				// 2. Перекидываем углы
-				el.angles.forEach(a => {
-					if (a.p1 === oldId) a.p1 = newId;
-					if (a.p2 === oldId) a.p2 = newId;
-					if (a.p3 === oldId) a.p3 = newId;
-				});
+					// 2. Перекидываем углы
+					el.angles.forEach(a => {
+						if (a.p1 === oldId) a.p1 = newId;
+						if (a.p2 === oldId) a.p2 = newId;
+						if (a.p3 === oldId) a.p3 = newId;
+					});
 
-				// --- ИСПРАВЛЕНИЕ ДУБЛИКАТОВ ---
-				el.lines = el.lines.filter((line, index, self) => {
-					// Удаляем петли (линия из точки в саму себя)
-					if (line.p1id === line.p2id) return false;
+					// --- ИСПРАВЛЕНИЕ ДУБЛИКАТОВ ---
+					el.lines = el.lines.filter((line, index, self) => {
+						// Удаляем петли (линия из точки в саму себя)
+						if (line.p1id === line.p2id) return false;
 
-					// Проверяем, нет ли такой же линии раньше в массиве
-					const firstIndex = self.findIndex(l => 
-						(l.p1id === line.p1id && l.p2id === line.p2id) || 
-						(l.p1id === line.p2id && l.p2id === line.p1id)
-					);
-					return index === firstIndex;
-				});
+						// Проверяем, нет ли такой же линии раньше в массиве
+						const firstIndex = self.findIndex(l => 
+							(l.p1id === line.p1id && l.p2id === line.p2id) || 
+							(l.p1id === line.p2id && l.p2id === line.p1id)
+						);
+						return index === firstIndex;
+					});
 
-				el.points = el.points.filter(p => p.id !== oldId);
-				
-				MathDrawingCore.save();
-				this.activePoint = null;
-				this.isDragging = false;
-				return; // Выходим, чтобы не сработала логика создания новой линии ниже
+					el.points = el.points.filter(p => p.id !== oldId);
+					
+					MathDrawingCore.save();
+					this.activePoint = null;
+					this.isDragging = false;
+					return; // Выходим, чтобы не сработала логика создания новой линии ниже
+				}
 			}
-		}
 		
 		// ИСПРАВЛЕНИЕ БАГА ПОДПИСИ: Очищаем draggingLabel всегда при отпускании
         if (this.draggingLabel) {
@@ -432,7 +459,7 @@ const MathDrawingEvents = {
 			}
 		}
 		
-		
+		}
 		// Проверка на двойной клик (интервал менее 300мс)
         if (now - this.lastTapTime < 300) {
             const target = MathDrawingEngine.findTarget(this.lastPos, el);
@@ -482,7 +509,7 @@ const MathDrawingEvents = {
                         parents: [], 
                         name: this.generateName() 
                     };
-                }
+                } 
                 el.points.push(target);
             }
             
@@ -508,29 +535,64 @@ const MathDrawingEvents = {
             }
         }
 		
-		
+		if (target && target.id !== this.activePoint.id) {
+			const mode = MathDrawingUI.currentMode;
+
+			// РЕЖИМ ОКРУЖНОСТИ
+			if (mode === 'circle') {
+				const alreadyExists = el.circles.find(c => 
+					c.centerId === this.activePoint.id && c.radiusId === target.id
+				);
+				if (!alreadyExists) {
+					el.circles.push({
+						id: Math.random(),
+						centerId: this.activePoint.id,
+						radiusId: target.id
+					});
+					MathDrawingCore.save();
+				}
+			} 
+			// ОБЫЧНЫЙ РЕЖИМ (ЛИНИЯ)
+			else if (!mode) {
+				const alreadyExists = el.lines.find(l => 
+					(l.p1id === this.activePoint.id && l.p2id === target.id) || 
+					(l.p1id === target.id && l.p2id === this.activePoint.id)
+				);
+
+				if (!alreadyExists) {
+					el.lines.push({ 
+						id: Math.random(), 
+						p1id: this.activePoint.id, 
+						p2id: target.id, 
+						// ... остальные поля линии
+					});
+					MathDrawingCore.save();
+				}
+			}
+		}
 		
 		
        
         this.isDragging = false;
         this.activePoint = null;
 		this.draggingLabel = null; // Дублирующая защита
-    },
+		},	
 
-	renderLoop() {
-        if (!this.ctx) return;
-        
-        try {
-            MathDrawingRender.draw(this.ctx, this.canvas, MathDrawingCore.elements, {
-                isDragging: this.isDragging,
-                activePoint: this.activePoint,
-                lastPos: this.lastPos,
-                selectedForAngle: this.selectedForAngle || []
-            });
-        } catch (err) {
-            console.error("Ошибка отрисовки:", err);
-        }
-        
-        requestAnimationFrame(() => this.renderLoop());
-    },
+		renderLoop(){
+			if (!this.ctx) return;
+			
+			try {
+				MathDrawingRender.draw(this.ctx, this.canvas, MathDrawingCore.elements, {
+					isDragging: this.isDragging,
+					activePoint: this.activePoint,
+					lastPos: this.lastPos,
+					selectedForAngle: this.selectedForAngle || []
+				});
+			} catch (err) {
+				console.error("Ошибка отрисовки:", err);
+			}
+			
+			requestAnimationFrame(() => this.renderLoop());
+		},
+	
 };
