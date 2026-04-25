@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Практикуем математику v3.0</title>
+    <title>Практикуем математику v9.0</title>
     
     <script>
         window.MathJax = {
@@ -79,6 +79,7 @@
 
 <div class="app-card" id="main-container">
     <section id="auth-section">
+	<button class="settings-btn" id="open-editor-btn" title="Открыть GeoEditor">⚙️</button>
         <h2 id="auth-title">Авторизуйся для выполнения заданий</h2>
         <input type="text" id="user-last-name" placeholder="Фамилия" style="margin-bottom:10px">
         <input type="text" id="user-first-name" placeholder="Имя">
@@ -86,8 +87,6 @@
     </section>
 
     <section id="menu-section" class="hidden">
-	
-		<button class="settings-btn" id="open-editor-btn" title="Открыть GeoEditor">⚙️</button>
 		
         <h2>Настройка занятия</h2>
         <div class="form-group"><label>Предмет</label><select id="select-subject"></select></div>
@@ -132,12 +131,9 @@
     </section>
 </div>
 
-	<script src="MathDrawingCore.js"></script>
-	<script src="MathDrawingEngine.js"></script>
-	<script src="MathDrawingRender.js"></script>
-	<script src="MathDrawingUI.js"></script>
-	<script src="MathDrawingEvents.js"></script>
-	<script> MathDrawingEvents.init('geoCanvas');</script>
+	
+<script src="app.js"></script>
+
 
 </body>
 </html>
