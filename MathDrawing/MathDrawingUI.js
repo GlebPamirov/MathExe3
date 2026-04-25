@@ -8,17 +8,21 @@ const MathDrawingUI = {
     menuTarget: null,
     greeks: ["α", "β", "γ", "δ", "φ"],
 
-    /** Переключение режима (Угол, Ластик и т.д.) */
-    toggleMode(mode) {
-        this.currentMode = (this.currentMode === mode) ? null : mode;
+    /** Переключение режима (Угол, Ластик, Окружность и т.д.) */
+    setMode(mode) {
+        this.currentMode = (this.currentMode === mode) ? null : mode; // Позволяет отжимать кнопки вручную 
         MathDrawingEvents.selectedForAngle = []; // Сброс выбора при смене режима
-        
-        document.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+		
+        document.querySelectorAll('.btn').forEach(btn => btn.classList.remove('active'));
         if (this.currentMode) {
             const btn = document.getElementById(mode + '-mode-btn');
+			
             if (btn) btn.classList.add('active');
+				numbers_of_circles_2 = MathDrawingCore.elements.circles.length;
         }
+		
     },
+	
 
     /** Открытие контекстного меню объекта */
     openMenu(obj, pos, type) {

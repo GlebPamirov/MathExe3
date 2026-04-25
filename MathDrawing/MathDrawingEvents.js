@@ -12,7 +12,7 @@ const MathDrawingEvents = {
     lastTapTime: 0,
     selectedForAngle: [],
     alphabet: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
-	draggingLabel: null, // Новое состояние
+	draggingLabel: null,
 	
 
 	init(canvasId) {
@@ -49,10 +49,22 @@ const MathDrawingEvents = {
     },
 
     handleStart(e) {
-        const pos = this.getPos(e);
+        const rawPos = this.getPos(e);
+		const pos = MathDrawingEngine.getSmartPos(rawPos, MathDrawingCore.elements);
         this.startPos = this.lastPos = pos;
         const el = MathDrawingCore.elements;
+		
+		//Координаты новой точки проходят через движок, чтобы просчитать проекции для примагничивания
+		const smartPos = MathDrawingEngine.getSmartPos(rawPos, MathDrawingCore.elements);
+
 		const target = MathDrawingEngine.findTarget(pos, el); // Выбор угла по трем точкам
+		
+		const newPoint = {
+			id: Math.random(),
+			x: smartPos.x,
+			y: smartPos.y,
+			name: this.generateName()
+		};
 		
 		// 1. Проверяем попадание в рамки подписей (у них должен быть сохранен lastBox)
         const all = [...el.points, ...el.lines];
@@ -62,7 +74,8 @@ const MathDrawingEvents = {
 
         if (hit) {
             this.draggingLabel = hit;
-            return; // Прерываем, чтобы не начать рисовать линию
+            this.activePoint = null; // Защита: не трогаем точку, если схватили подпись
+            return; 
         }
 
         // Закрываем меню при новом клике
@@ -115,6 +128,8 @@ const MathDrawingEvents = {
 				return;
 			}
 			return;
+			
+			MathDrawingUI.setMode(null);
 		}
 		
 			// Логика режима "Угол" по трем точкам
@@ -140,7 +155,7 @@ const MathDrawingEvents = {
 					MathDrawingCore.save();
 					
 					this.selectedForAngle = []; // Сброс выбора
-					MathDrawingUI.toggleMode(null); // Выход из режима после создания
+					MathDrawingUI.setMode(null); // Выход из режима после создания
 				}
 			}
 			return;
@@ -196,7 +211,7 @@ const MathDrawingEvents = {
 			MathDrawingUI.openMenu(angleTarget, pos, 'angle');
 			return;
 		}
-		
+		MathDrawingRender.draw(this.ctx, this.canvas, el, this);
     },
 
     generateName() {
@@ -204,24 +219,31 @@ const MathDrawingEvents = {
     },
 
     handleMove(e) {
-        const pos = this.getPos(e);
+		const rawPos = this.getPos(e);
+        const pos = MathDrawingEngine.getSmartPos(rawPos, MathDrawingCore.elements);
         this.lastPos = pos;
         if (Math.hypot(pos.x - this.startPos.x, pos.y - this.startPos.y) > 10) clearTimeout(this.tapTimer);
 		
 		if (this.draggingLabel) {
             const obj = this.draggingLabel;
             const el = MathDrawingCore.elements;
+			
+			// Вычисляем базу (точку, от которой считается смещение подписи)
             let base = obj.p1id 
                 ? { 
                     x: (el.points.find(p=>p.id===obj.p1id).x + el.points.find(p=>p.id===obj.p2id).x)/2, 
                     y: (el.points.find(p=>p.id===obj.p1id).y + el.points.find(p=>p.id===obj.p2id).y)/2 
                   }
                 : { x: obj.x, y: obj.y };
-
+				
+			// Новое смещение относительно базы
             let dx = pos.x - base.x;
             let dy = pos.y - base.y;
+			
+			//this.activePoint.x = pos.x;
+			//this.activePoint.y = pos.y;
 
-            // Лимит 70px
+            // Ограничение дистанции "поводка" подписи
             const dist = Math.hypot(dx, dy);
             if (dist > 70) {
                 dx *= 70/dist; dy *= 70/dist;
@@ -229,6 +251,9 @@ const MathDrawingEvents = {
 
             obj.labelOff = { dx, dy };
             obj.isManual = false; // Фиксируем ручной режим
+			
+			MathDrawingEngine.updateBoundPoints(MathDrawingCore.elements);
+			
             return;
         }
 
@@ -535,14 +560,17 @@ const MathDrawingEvents = {
             }
         }
 		
-		if (target && target.id !== this.activePoint.id) {
+		if (target && this.activePoint && target.id !== this.activePoint.id) {
 			const mode = MathDrawingUI.currentMode;
+			const el = MathDrawingCore.elements;
 
 			// РЕЖИМ ОКРУЖНОСТИ
 			if (mode === 'circle') {
-				const alreadyExists = el.circles.find(c => 
-					c.centerId === this.activePoint.id && c.radiusId === target.id
+				const alreadyExists = el.circles?.find(c => 
+					c.centerId === this.activePoint.id && 
+					c.radiusId === target.id
 				);
+				
 				if (!alreadyExists) {
 					el.circles.push({
 						id: Math.random(),
@@ -551,7 +579,10 @@ const MathDrawingEvents = {
 					});
 					MathDrawingCore.save();
 				}
+				
+				MathDrawingUI.setMode(null);
 			} 
+			
 			// ОБЫЧНЫЙ РЕЖИМ (ЛИНИЯ)
 			else if (!mode) {
 				const alreadyExists = el.lines.find(l => 
@@ -576,6 +607,7 @@ const MathDrawingEvents = {
         this.isDragging = false;
         this.activePoint = null;
 		this.draggingLabel = null; // Дублирующая защита
+		
 		},	
 
 		renderLoop(){

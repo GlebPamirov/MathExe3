@@ -53,12 +53,29 @@ const MathDrawingCore = {
     },
 
     /** Полная очистка холста */
+    /** Полная очистка холста и данных */
     clearAll() {
-        if (confirm("Удалить всё?")) {
-            this.elements = { points: [], lines: [], angles: [] };
+        if (confirm("Вы уверены, что хотите полностью очистить чертеж?")) {
+            // МЫ НЕ УДАЛЯЕМ ОБЪЕКТ, А ОБНУЛЯЕМ ЕГО СВОЙСТВА
+            this.elements = {
+                points: [],
+                lines: [],
+                angles: [],
+                circles: [] // Обязательно добавляем сюда!
+            };
+            
+            // Сбрасываем историю, чтобы нельзя было сделать Undo к ошибке
+            this.history = [];
+            this.hStep = -1;
+            
+            // Сохраняем чистое состояние как начальную точку
             this.save();
-            MathDrawingUI.closeMenu();
+            
+            // Если у вас есть вызов отрисовки или закрытия меню:
+            if (typeof MathDrawingUI !== 'undefined') MathDrawingUI.closeMenu();
+            
+            console.log("Чертеж очищен, структура данных восстановлена.");
         }
-    }
+    },
 };
 

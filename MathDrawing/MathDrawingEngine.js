@@ -5,12 +5,92 @@
  */
 const MathDrawingEngine = {
     GRID: 25,       // Шаг сетки
-    SNAP_DIST: 15,  // Дистанция притяжения (магнит)
+    SNAP_DIST: 5,  // Дистанция притяжения (магнит)
 
     /** Привязка значения к сетке */
     snap(val) {
         return Math.round(val / this.GRID) * this.GRID;
     },
+	
+	// Приоритет привязки точек: 1) окружность, 2) линия, 3) точка, 4) сетка
+	getSmartPos(pos, elements) {
+        const SNAP = this.SNAP_DIST;
+		const self = this;
+
+        // ПРИОРИТЕТ 1: ОКРУЖНОСТЬ (Линия окружности)
+        if (elements.circles && elements.circles.length > 0) {
+            let bestCirclePos = null;
+            let minCircleDist = Infinity;
+
+            elements.circles.forEach(c => {
+                const center = elements.points.find(p => p.id === c.centerId);
+                const radiusPt = elements.points.find(p => p.id === c.radiusId);
+                if (!center || !radiusPt) return;
+
+                const radius = this.getDist(center, radiusPt);
+                const distToCenter = this.getDist(pos, center);
+                const delta = Math.abs(distToCenter - radius);
+
+                if (delta < SNAP && delta < minCircleDist) {
+                    minCircleDist = delta;
+                    const angle = Math.atan2(pos.y - center.y, pos.x - center.x);
+                    bestCirclePos = {
+                        x: center.x + Math.cos(angle) * radius,
+                        y: center.y + Math.sin(angle) * radius
+                    };
+                }
+            });
+            if (bestCirclePos) return bestCirclePos;
+        }
+
+        // ПРИОРИТЕТ 2: ЛИНИЯ (Отрезок)
+        let bestLineProj = null;
+        let minLineDist = Infinity;
+
+        elements.lines.forEach((l) => {
+            const proj = self.getProjection(pos, l, elements.points);
+            if (proj) {
+                const d = this.getDist(pos, proj);
+                if (d < SNAP && d < minLineDist) {
+                    minLineDist = d;
+                    bestLineProj = { x: proj.x, y: proj.y };
+                }
+            }
+        });
+        if (bestLineProj) return bestLineProj;
+
+        // ПРИОРИТЕТ 3: СУЩЕСТВУЮЩАЯ ТОЧКА
+        const nearbyPoint = elements.points.find(p => this.getDist(pos, p) < SNAP);
+        if (nearbyPoint) return { x: nearbyPoint.x, y: nearbyPoint.y };
+
+        // ПРИОРИТЕТ 4: СЕТКА
+        const gx = this.snap(pos.x);
+        const gy = this.snap(pos.y);
+        if (this.getDist(pos, { x: gx, y: gy }) < SNAP) {
+            return { x: gx, y: gy };
+        }
+
+        // Если ничего не подошло — свободное положение
+        return { x: pos.x, y: pos.y };
+    },
+	
+	/** Вспомогательный метод для поиска лучшей проекции на линии */
+	getBestLineProjection(pos, lines, points) {
+		let bestProj = null;
+		let minDist = Infinity;
+
+		lines.forEach(l => {
+			const proj = this.getProjection(pos, l, points);
+			if (proj) {
+				const d = this.getDist(pos, proj);
+				if (d < minDist) {
+					minDist = d;
+					bestProj = proj;
+				}
+			}
+		});
+		return bestProj;
+	},
 
     /** Расстояние между двумя точками {x, y} */
     getDist(p1, p2) {
@@ -66,6 +146,9 @@ const MathDrawingEngine = {
     /** Проверка пересечения линии и прямоугольника (рамки подписи) */
     lineRectIntersect(p1, p2, rx, ry, rw, rh) {
         const intersect = (a, b, c, d) => {
+			// ЗАЩИТА: Если хотя бы один аргумент не определен или не имеет координат, выходим
+			if (!a || !b || !c || !d || a.x === undefined || c.x === undefined) return false;
+			
             const det = (b.x - a.x) * (d.y - c.y) - (b.y - a.y) * (d.x - c.x);
             if (det === 0) return false;
             const lambda = ((d.y - c.y) * (d.x - a.x) + (c.x - d.x) * (d.y - a.y)) / det;
@@ -348,6 +431,27 @@ const MathDrawingEngine = {
 			MathDrawingCore.save();
 			MathDrawingUI.closeMenu();
 		}
-	}
+	},
+	
+	/** Находит проекцию точки p на конкретный отрезок l */
+    getProjection(p, l, points) {
+        const p1 = points.find(pt => pt.id === l.p1id);
+        const p2 = points.find(pt => pt.id === l.p2id);
+		
+		// ЗАЩИТА: Если одна из точек не найдена, возвращаем null
+        if (!p1 || !p2) return null;
+
+        const L2 = (p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2;
+        if (L2 === 0) return p1;
+
+        let t = ((p.x - p1.x) * (p2.x - p1.x) + (p.y - p1.y) * (p2.y - p1.y)) / L2;
+        t = Math.max(0, Math.min(1, t));
+
+        return {
+            x: p1.x + t * (p2.x - p1.x),
+            y: p1.y + t * (p2.y - p1.y),
+            t: t
+        };
+    },
 	
 };
