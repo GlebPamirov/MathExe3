@@ -11,9 +11,10 @@
     <div class="toolbar">
         <button class="btn" onclick="MathDrawingCore.undo()">↩</button>
         <button class="btn" onclick="MathDrawingCore.redo()">↪</button>
-        <button class="btn" id="angle-mode-btn" onclick="MathDrawingUI.toggleMode('angle')">📐 Угол</button>
-        <button class="btn" id="eraser-mode-btn" onclick="MathDrawingUI.toggleMode('eraser')">🧼 Ластик</button>
-        <button class="btn" style="margin-left:auto" onclick="MathDrawingCore.clearAll()">Очистить</button>
+        <button class="btn" id="angle-mode-btn" onclick="MathDrawingUI.toggleMode('angle')">📐</button>
+		<button class="btn" id="circle-mode-btn" onclick="MathDrawingUI.toggleMode('circle')">⭕</button>
+        <button class="btn" id="eraser-mode-btn" onclick="MathDrawingUI.toggleMode('eraser')">🧼</button>
+        <button class="btn" style="margin-left:auto" onclick="MathDrawingCore.clearAll()"> ♻ </button>
     </div>
 
     <div id="canvas-container">

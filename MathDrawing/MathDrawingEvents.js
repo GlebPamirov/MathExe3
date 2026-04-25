@@ -173,20 +173,27 @@ const MathDrawingEvents = {
 		
 		
 		const angleTarget = el.angles.find(ang => {
-			// 1. Проверка попадания в бокс подписи (уже есть)
-			if (ang.lastBox && this.isPointInBox(pos, ang.lastBox)) return true;
+		// 1. Проверка попадания в бокс подписи
+			if (ang.lastBox) {
+				const box = ang.lastBox;
+				const inBox = pos.x >= box.x && 
+							  pos.x <= box.x + box.w && 
+							  pos.y >= box.y && 
+							  pos.y <= box.y + box.h;
+				if (inBox) return true;
+			}
 
 			// 2. Проверка попадания в "активную зону" вершины (40 пикселей)
 			const vertex = el.points.find(p => p.id === ang.p2);
 			if (vertex) {
 				const distToVertex = MathDrawingEngine.getDist(pos, vertex);
-				if (distToVertex < 40) return true; // Увеличенная область захвата
+				if (distToVertex < 40) return true;
 			}
 			return false;
 		});
 
 		if (angleTarget) {
-			this.openMenu(angleTarget, pos, 'angle');
+			MathDrawingUI.openMenu(angleTarget, pos, 'angle');
 			return;
 		}
 		
