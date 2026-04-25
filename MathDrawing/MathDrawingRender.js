@@ -12,10 +12,10 @@ const MathDrawingRender = {
         this.drawGrid(ctx, canvas.width, canvas.height);
         
         // Порядок важен: сначала углы, потом линии, в конце точки
-        elements.angles.forEach(ang => this.drawAngle(ctx, ang, elements.points));
-		elements.circles.forEach(c => this.drawCircle(ctx, c, elements.points));
-        elements.lines.forEach(l => this.drawLine(ctx, l, elements.points));
-        elements.points.forEach(p => this.drawPoint(ctx, p, state.selectedForAngle));
+        elements.angles?.forEach(ang => this.drawAngle(ctx, ang, elements.points));
+		elements.circles?.forEach(c => this.drawCircle(ctx, c, elements.points));
+        elements.lines?.forEach(l => this.drawLine(ctx, l, elements.points));
+        elements.points?.forEach(p => this.drawPoint(ctx, p, state.selectedForAngle));
 		
 
         // Отрисовка "резиновой нити" при создании линии
