@@ -6,7 +6,8 @@
  
  // Ссылки на БАЗЫ гугл-таблицу 
  // База геометрических чертежей
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx_xoiL0mZnB4UxmAdynlLTTg3e8urpIe0DprG9ZdEd7QLIWW8XH2douovdRFMOnJ4nZw/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw_Tx9XY5nE6LPCPvtWMyhaELKS06mHp3nBAfZV0xFPjn707wvsvHTOp-zVWbNDTNM0xw/exec";
+
  
 const MathDrawingUI = {
     currentMode: null,
@@ -265,63 +266,74 @@ const MathDrawingUI = {
     },
 	
 	// ФУНКЦИЯ СОХРАНЕНИЯ В ТАБЛИЦУ
-    async saveToSheets() {
-		const data = {
-			id: Math.random().toString(36).substr(2, 9),
-			author: "Ваня Пупкин",
-			text: document.getElementById('user-comment').value || "Без названия",
-			code: JSON.stringify(MathDrawingCore.elements)
-		};
+    saveToSheets() {
+        const data = {
+            id: Math.random().toString(36).substr(2, 9),
+            author: "Ваня Пупкин",
+            text: document.getElementById('user-comment').value || "Без названия",
+            code: JSON.stringify(MathDrawingCore.elements)
+        };
 
-		// Чтобы избежать CORS-блокировки при перенаправлении Google,
-		// используем mode: 'no-cors'. Это отправит данные, но мы не сможем 
-		// прочитать ответ "success" (он просто придет в таблицу).
-		try {
-			await fetch(SCRIPT_URL, {
-				method: 'POST',
-				mode: 'no-cors', // Важно для работы из локального файла
-				headers: {
-					'Content-Type': 'text/plain' // Google лучше принимает это
-				},
-				body: JSON.stringify(data)
-			});
-			
-			alert("Запрос отправлен! Проверьте таблицу через пару секунд.");
-			this.loadListFromSheets(); 
-		} catch (e) {
-			console.error("Ошибка:", e);
-			alert("Ошибка сети. Попробуйте еще раз.");
-		}
-	},
+        // Создаем невидимый iframe, если его еще нет
+        let iframe = document.getElementById('hidden_iframe');
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'hidden_iframe';
+            iframe.name = 'hidden_iframe';
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+        }
 
-    // ФУНКЦИЯ ЗАГРУЗКИ СПИСКА ДЛЯ ВЫПАДАЮЩЕГО МЕНЮ
-    async loadListFromSheets() {
-        try {
-            const response = await fetch(SCRIPT_URL);
-            const list = await response.json();
+        // Создаем форму для отправки
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = SCRIPT_URL;
+        form.target = 'hidden_iframe'; // Отправляем в iframe, чтобы страница не дергалась
+        
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'payload';
+        input.value = JSON.stringify(data);
+        
+        form.appendChild(input);
+        document.body.appendChild(form);
+        form.submit(); // Отправка!
+
+        alert("Чертеж отправлен в таблицу!");
+        document.body.removeChild(form);
+        
+        // Обновляем список в меню через 2 секунды
+        setTimeout(() => this.loadListFromSheets(), 2000);
+    },
+
+    loadListFromSheets() {
+        window.handleGoogleData = (list) => {
             const select = document.getElementById('sheet-load-select');
-            
+            if (!select) return;
             select.innerHTML = '<option value="">-- Выберите чертеж --</option>';
-            list.forEach(item => {
+            list.reverse().forEach(item => { // Новые сверху
                 const opt = document.createElement('option');
                 opt.value = item.code;
                 opt.textContent = `${item.author}: ${item.text}`;
                 select.appendChild(opt);
             });
+        };
+
+        const script = document.createElement('script');
+        script.src = `${SCRIPT_URL}?callback=handleGoogleData&t=${Date.now()}`;
+        document.body.appendChild(script);
+        // Скрипт сам удалится после выполнения или можно оставить так
+    },
+    
+    importFromValue(code) {
+        if (!code) return;
+        try {
+            MathDrawingCore.elements = JSON.parse(code);
+            MathDrawingCore.save();
+            // Рендер автоматически подхватит изменения при save()
         } catch (e) {
-            console.log("Список пуст или недоступен");
+            alert("Ошибка при чтении кода");
         }
     },
-	
-	importFromValue(code) {
-		if (!code) return;
-		try {
-			MathDrawingCore.elements = JSON.parse(code);
-			MathDrawingCore.save();
-			alert("Чертеж загружен!");
-		} catch (e) {
-			alert("Ошибка при чтении кода");
-		}
-	},
 	
 };
