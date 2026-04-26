@@ -6,7 +6,7 @@
  
  // Ссылки на БАЗЫ гугл-таблицу 
  // База геометрических чертежей
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrVXLuKdWhRDgYO9mQ2wgU86mQFWWTJkPByDkOwawTa4IsGxtPpSZ1cWROW4O_JQVnOA/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwwhUQfmQ-ab9Y7K5G4BzCwjdU02CA_3Lw8T29QU7Wlh-9xkuya6_gsF5hXiVPLDcyKng/exec";
 
  
 const MathDrawingUI = {
@@ -269,8 +269,8 @@ const MathDrawingUI = {
     saveToSheets() {
         const data = {
             id: Math.random().toString(36).substr(2, 9),
-            author: "Ваня Пупкин",
-            text: document.getElementById('user-comment')?.value || "Без названия",
+            author: document.getElementById('user-last-name')?.value|| "Аноним",
+            text: document.getElementById('user-comment')?.value || "Безымянный",
             code: JSON.stringify(MathDrawingCore.elements)
         };
 
@@ -306,30 +306,53 @@ const MathDrawingUI = {
         setTimeout(() => this.loadListFromSheets(), 3000);
     },
 
+    // 1. Загрузка только списка имен при старте
     loadListFromSheets() {
-        // Удаляем старый скрипт JSONP, если он есть
         const oldScript = document.getElementById('jsonp-loader');
         if (oldScript) oldScript.remove();
 
-        // Глобальная функция-приемник
-        window.handleSheetData = (list) => {
+        window.handleSheetList = (list) => {
             const select = document.getElementById('sheet-load-select');
             if (!select) return;
-            
             select.innerHTML = '<option value="">-- Выберите чертеж --</option>';
-            // Выводим в обратном порядке (новые сверху)
-            list.slice().reverse().forEach(item => {
+            
+            // Новые записи будут сверху
+            list.reverse().forEach(item => {
                 const opt = document.createElement('option');
-                opt.value = item.code;
+                opt.value = item.index; // Теперь здесь индекс, а не тяжелый код
                 opt.textContent = `${item.author}: ${item.text}`;
                 select.appendChild(opt);
             });
         };
 
-        // Загружаем данные через тег <script> (CORS игнорируется)
         const script = document.createElement('script');
         script.id = 'jsonp-loader';
-        script.src = `${SCRIPT_URL}?callback=handleSheetData&t=${Date.now()}`;
+        script.src = `${SCRIPT_URL}?callback=handleSheetList&t=${Date.now()}`;
+        document.body.appendChild(script);
+    },
+
+    // 2. Загрузка конкретного чертежа при выборе из списка
+    loadSingleDrawing(index) {
+        if (index === "") return;
+
+        const oldScript = document.getElementById('jsonp-single-loader');
+        if (oldScript) oldScript.remove();
+
+        window.handleSingleDrawing = (data) => {
+            if (data && data.code) {
+                try {
+                    MathDrawingCore.elements = JSON.parse(data.code);
+                    MathDrawingCore.save();
+                    // Рендер обновится автоматически благодаря вызову save()
+                } catch (e) {
+                    alert("Ошибка при разборе данных чертежа");
+                }
+            }
+        };
+
+        const script = document.createElement('script');
+        script.id = 'jsonp-single-loader';
+        script.src = `${SCRIPT_URL}?callback=handleSingleDrawing&index=${index}&t=${Date.now()}`;
         document.body.appendChild(script);
     },
     

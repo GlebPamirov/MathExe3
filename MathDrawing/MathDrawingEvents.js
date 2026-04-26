@@ -40,6 +40,9 @@ const MathDrawingEvents = {
 
         console.log("Events initialized. Starting loop...");
         this.renderLoop(); 
+		
+		// Подгружаем список задач из таблицы геометрических чертежей сразу после загрузки редактора
+		MathDrawingUI.loadListFromSheets();
     },
 
     getPos(e) {
