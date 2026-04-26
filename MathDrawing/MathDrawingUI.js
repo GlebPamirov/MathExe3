@@ -3,6 +3,11 @@
 /**
  * MathDrawingUI — Модуль интерфейса.
  */
+ 
+ // Ссылки на БАЗЫ гугл-таблицу 
+ // База геометрических чертежей
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx_xoiL0mZnB4UxmAdynlLTTg3e8urpIe0DprG9ZdEd7QLIWW8XH2douovdRFMOnJ4nZw/exec";
+ 
 const MathDrawingUI = {
     currentMode: null,
     menuTarget: null,
@@ -190,5 +195,133 @@ const MathDrawingUI = {
         MathDrawingCore.save();
         this.closeMenu(); // Закрываем меню для подтверждения
     },
+	
+	
+	saveResult() {
+        const author = "Ваня Пупкин"; // По умолчанию
+        const comment = document.getElementById('user-comment').value || "Без комментария";
+        
+        // Сериализуем текущие элементы в компактную строку JSON
+        // Это и есть наш "код", который можно хранить в одной ячейке таблицы
+        const canvasCode = JSON.stringify(MathDrawingCore.elements);
+
+        const result = {
+            author: author,
+            text: comment,
+            code: canvasCode,
+            timestamp: new Date().toLocaleString()
+        };
+
+        // Вывод для отладки в нижней части экрана
+        this.displayDebug(result);
+        
+        console.log("Данные готовы для Google Таблиц:", result);
+        return result;
+    },
+
+    displayDebug(data) {
+        const container = document.getElementById('debug-content');
+        if (container) {
+            container.innerHTML = `
+                <br><b>Автор:</b> ${data.author}
+                <br><b>Текст:</b> ${data.text}
+                <br><b>JSON Code:</b> ${data.code}
+                <br><b>Время:</b> ${data.timestamp}
+            `;
+        }
+    },
+	
+	importResult() {
+        const codeInput = document.getElementById('import-code').value;
+        if (!codeInput) {
+            alert("Пожалуйста, вставьте код!");
+            return;
+        }
+
+        try {
+            // Превращаем строку обратно в объект
+            const importedData = JSON.parse(codeInput);
+
+            // Простая проверка структуры данных (валидация)
+            if (importedData.points && importedData.lines) {
+                
+                // Передаем данные в ядро
+                MathDrawingCore.elements = importedData;
+                
+                // Сохраняем в историю, чтобы можно было сделать Undo
+                MathDrawingCore.save();
+                
+                // Очищаем поле ввода
+                document.getElementById('import-code').value = '';
+                
+                alert("Чертеж успешно загружен!");
+            } else {
+                throw new Error("Неверный формат данных");
+            }
+        } catch (e) {
+            console.error("Ошибка импорта:", e);
+            alert("Ошибка: Некорректный код чертежа.");
+        }
+    },
+	
+	// ФУНКЦИЯ СОХРАНЕНИЯ В ТАБЛИЦУ
+    async saveToSheets() {
+		const data = {
+			id: Math.random().toString(36).substr(2, 9),
+			author: "Ваня Пупкин",
+			text: document.getElementById('user-comment').value || "Без названия",
+			code: JSON.stringify(MathDrawingCore.elements)
+		};
+
+		// Чтобы избежать CORS-блокировки при перенаправлении Google,
+		// используем mode: 'no-cors'. Это отправит данные, но мы не сможем 
+		// прочитать ответ "success" (он просто придет в таблицу).
+		try {
+			await fetch(SCRIPT_URL, {
+				method: 'POST',
+				mode: 'no-cors', // Важно для работы из локального файла
+				headers: {
+					'Content-Type': 'text/plain' // Google лучше принимает это
+				},
+				body: JSON.stringify(data)
+			});
+			
+			alert("Запрос отправлен! Проверьте таблицу через пару секунд.");
+			this.loadListFromSheets(); 
+		} catch (e) {
+			console.error("Ошибка:", e);
+			alert("Ошибка сети. Попробуйте еще раз.");
+		}
+	},
+
+    // ФУНКЦИЯ ЗАГРУЗКИ СПИСКА ДЛЯ ВЫПАДАЮЩЕГО МЕНЮ
+    async loadListFromSheets() {
+        try {
+            const response = await fetch(SCRIPT_URL);
+            const list = await response.json();
+            const select = document.getElementById('sheet-load-select');
+            
+            select.innerHTML = '<option value="">-- Выберите чертеж --</option>';
+            list.forEach(item => {
+                const opt = document.createElement('option');
+                opt.value = item.code;
+                opt.textContent = `${item.author}: ${item.text}`;
+                select.appendChild(opt);
+            });
+        } catch (e) {
+            console.log("Список пуст или недоступен");
+        }
+    },
+	
+	importFromValue(code) {
+		if (!code) return;
+		try {
+			MathDrawingCore.elements = JSON.parse(code);
+			MathDrawingCore.save();
+			alert("Чертеж загружен!");
+		} catch (e) {
+			alert("Ошибка при чтении кода");
+		}
+	},
 	
 };

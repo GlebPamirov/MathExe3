@@ -1,6 +1,15 @@
 :root { --accent: #0984e3; --panel: #ffffff; --shadow: rgba(0,0,0,0.2); }
 
-body { font-family: system-ui; display: flex; flex-direction: column; align-items: center; background: #dfe6e9; margin: 0; padding: 10px; overflow: hidden; touch-action: none; }
+body { 
+	font-family: system-ui; 
+	display: flex; 
+	flex-direction: column; 
+	align-items: center; 
+	background: #dfe6e9;
+	margin: 0; 
+	padding: 10px; 
+	/* overflow: hidden;  запрет прокрутки */
+	touch-action: none; }
 
 .toolbar { background: var(--panel); padding: 10px; border-radius: 10px; display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 380px; z-index: 10; }
 
