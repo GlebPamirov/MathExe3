@@ -79,7 +79,6 @@
 
 <div class="app-card" id="main-container">
     <section id="auth-section">
-	<button class="settings-btn" id="open-editor-btn" title="Открыть GeoEditor">⚙️</button>
         <h2 id="auth-title">Авторизуйся для выполнения заданий</h2>
         <input type="text" id="user-last-name" placeholder="Фамилия" style="margin-bottom:10px">
         <input type="text" id="user-first-name" placeholder="Имя">
@@ -89,6 +88,7 @@
     <section id="menu-section" class="hidden">
 		
         <h2>Настройка занятия</h2>
+		<button class="settings-btn" id="open-editor-btn" title="Открыть GeoEditor">⚙️</button>
         <div class="form-group"><label>Предмет</label><select id="select-subject"></select></div>
         <div class="form-group"><label>Класс</label><select id="select-grade" disabled></select></div>
         <div class="form-group"><label>Тема</label><select id="select-topic" disabled></select></div>
@@ -133,7 +133,18 @@
 
 	
 <script src="app.js"></script>
-
+	
+	
+	<script>
+	// Слушаем изменения в полях ввода для передачи в кэш браузера
+		document.getElementById('user-last-name').addEventListener('input', function() {
+			localStorage.setItem('cached_last_name', this.value);
+		});
+		
+		document.getElementById('user-first-name').addEventListener('input', function() {
+			localStorage.setItem('cached_first_name', this.value);
+		});
+	</script>
 
 </body>
 </html>
