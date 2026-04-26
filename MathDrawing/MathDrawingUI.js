@@ -197,41 +197,6 @@ const MathDrawingUI = {
         this.closeMenu(); // Закрываем меню для подтверждения
     },
 	
-	
-	saveResult() {
-        const author = "Ваня Пупкин"; // По умолчанию
-        const comment = document.getElementById('user-comment').value || "Без комментария";
-        
-        // Сериализуем текущие элементы в компактную строку JSON
-        // Это и есть наш "код", который можно хранить в одной ячейке таблицы
-        const canvasCode = JSON.stringify(MathDrawingCore.elements);
-
-        const result = {
-            author: author,
-            text: comment,
-            code: canvasCode,
-            timestamp: new Date().toLocaleString()
-        };
-
-        // Вывод для отладки в нижней части экрана
-        this.displayDebug(result);
-        
-        console.log("Данные готовы для Google Таблиц:", result);
-        return result;
-    },
-
-    displayDebug(data) {
-        const container = document.getElementById('debug-content');
-        if (container) {
-            container.innerHTML = `
-                <br><b>Автор:</b> ${data.author}
-                <br><b>Текст:</b> ${data.text}
-                <br><b>JSON Code:</b> ${data.code}
-                <br><b>Время:</b> ${data.timestamp}
-            `;
-        }
-    },
-	
 	importResult() {
         const codeInput = document.getElementById('import-code').value;
         if (!codeInput) {
@@ -267,9 +232,12 @@ const MathDrawingUI = {
 	
 	// ФУНКЦИЯ СОХРАНЕНИЯ В ТАБЛИЦУ
     saveToSheets() {
+		
+		const savedUserName = localStorage.getItem('cached_last_name') + " " + localStorage.getItem('cached_first_name') || "Аноним";
+		
         const data = {
             id: Math.random().toString(36).substr(2, 9),
-            author: document.getElementById('user-last-name')?.value|| "Аноним",
+            author: savedUserName,
             text: document.getElementById('user-comment')?.value || "Безымянный",
             code: JSON.stringify(MathDrawingCore.elements)
         };
