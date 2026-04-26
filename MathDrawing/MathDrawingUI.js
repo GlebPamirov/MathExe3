@@ -6,7 +6,7 @@
  
  // Ссылки на БАЗЫ гугл-таблицу 
  // База геометрических чертежей
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw_Tx9XY5nE6LPCPvtWMyhaELKS06mHp3nBAfZV0xFPjn707wvsvHTOp-zVWbNDTNM0xw/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxrVXLuKdWhRDgYO9mQ2wgU86mQFWWTJkPByDkOwawTa4IsGxtPpSZ1cWROW4O_JQVnOA/exec";
 
  
 const MathDrawingUI = {
@@ -270,11 +270,11 @@ const MathDrawingUI = {
         const data = {
             id: Math.random().toString(36).substr(2, 9),
             author: "Ваня Пупкин",
-            text: document.getElementById('user-comment').value || "Без названия",
+            text: document.getElementById('user-comment')?.value || "Без названия",
             code: JSON.stringify(MathDrawingCore.elements)
         };
 
-        // Создаем невидимый iframe, если его еще нет
+        // 1. Создаем/находим невидимый iframe
         let iframe = document.getElementById('hidden_iframe');
         if (!iframe) {
             iframe = document.createElement('iframe');
@@ -284,34 +284,41 @@ const MathDrawingUI = {
             document.body.appendChild(iframe);
         }
 
-        // Создаем форму для отправки
+        // 2. Создаем временную форму
         const form = document.createElement('form');
         form.method = 'POST';
         form.action = SCRIPT_URL;
-        form.target = 'hidden_iframe'; // Отправляем в iframe, чтобы страница не дергалась
+        form.target = 'hidden_iframe'; // Отправка без перезагрузки страницы
         
         const input = document.createElement('input');
-        input.type = 'hidden';
         input.name = 'payload';
         input.value = JSON.stringify(data);
         
         form.appendChild(input);
         document.body.appendChild(form);
-        form.submit(); // Отправка!
-
-        alert("Чертеж отправлен в таблицу!");
+        
+        form.submit(); // Поехали!
+        
+        alert("Данные отправлены в таблицу!");
         document.body.removeChild(form);
         
-        // Обновляем список в меню через 2 секунды
-        setTimeout(() => this.loadListFromSheets(), 2000);
+        // Обновляем список через 3 секунды, чтобы Google успел записать
+        setTimeout(() => this.loadListFromSheets(), 3000);
     },
 
     loadListFromSheets() {
-        window.handleGoogleData = (list) => {
+        // Удаляем старый скрипт JSONP, если он есть
+        const oldScript = document.getElementById('jsonp-loader');
+        if (oldScript) oldScript.remove();
+
+        // Глобальная функция-приемник
+        window.handleSheetData = (list) => {
             const select = document.getElementById('sheet-load-select');
             if (!select) return;
+            
             select.innerHTML = '<option value="">-- Выберите чертеж --</option>';
-            list.reverse().forEach(item => { // Новые сверху
+            // Выводим в обратном порядке (новые сверху)
+            list.slice().reverse().forEach(item => {
                 const opt = document.createElement('option');
                 opt.value = item.code;
                 opt.textContent = `${item.author}: ${item.text}`;
@@ -319,10 +326,11 @@ const MathDrawingUI = {
             });
         };
 
+        // Загружаем данные через тег <script> (CORS игнорируется)
         const script = document.createElement('script');
-        script.src = `${SCRIPT_URL}?callback=handleGoogleData&t=${Date.now()}`;
+        script.id = 'jsonp-loader';
+        script.src = `${SCRIPT_URL}?callback=handleSheetData&t=${Date.now()}`;
         document.body.appendChild(script);
-        // Скрипт сам удалится после выполнения или можно оставить так
     },
     
     importFromValue(code) {

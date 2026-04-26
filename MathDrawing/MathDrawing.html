@@ -25,22 +25,17 @@
         </div>
     </div>
 	
-	<div class="save-controls" style="padding: 10px; display: flex; flex-direction: column; gap: 10px; max-width: 400px;">
-		<input type="text" id="user-comment" placeholder="Введите ваш текст здесь..." class="menu-input" style="width: 100%;">
-		<button class="btn" onclick="MathDrawingUI.saveResult()" style="width: 100%; background: #00b894; color: white;">Сохранить результат</button>
-	</div>
-	
 	<div class="sheet-controls" style="padding: 10px; border: 1px solid #ddd; margin: 10px; border-radius: 8px;">
-		<h4>Синхронизация с таблицей</h4>
+		<h4>Синхронизация с базой данных</h4>
 		
 		<input type="text" id="user-comment" placeholder="Название чертежа" class="menu-input">
-		<button class="btn" onclick="MathDrawingUI.saveToSheets()">Сохранить в Google Таблицу</button>
+		<button class="btn" onclick="MathDrawingUI.saveToSheets()">Сохранить</button>
 		
 		<hr>
 		
-		<label>Загрузить из базы:</label>
+		<label>Загрузить:</label>
 		<select id="sheet-load-select" class="menu-input" onchange="MathDrawingUI.importFromValue(this.value)">
-			<option value="">Загрузка списка...</option>
+			<option value="">Загрузка задач...</option>
 		</select>
 	</div>
 	
